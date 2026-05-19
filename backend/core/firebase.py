@@ -20,12 +20,12 @@ def _make_credentials():
             client_id=data["client_id"],
             client_secret=data["client_secret"],
             token_uri="https://oauth2.googleapis.com/token",
-            scopes=["https://www.googleapis.com/auth/datastore"],
+            scopes=["https://www.googleapis.com/auth/cloud-platform"],
         )
     else:
         import google.auth
         creds, _ = google.auth.default(
-            scopes=["https://www.googleapis.com/auth/datastore"]
+            scopes=["https://www.googleapis.com/auth/cloud-platform"]
         )
     if not getattr(creds, "token", None):
         from google.auth.transport.requests import Request
