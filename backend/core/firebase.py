@@ -16,7 +16,8 @@ def init_firebase():
             tmp.close()
             os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = tmp.name
         cred = credentials.ApplicationDefault()
-        firebase_admin.initialize_app(cred)
+        project_id = os.environ.get("FIREBASE_PROJECT_ID") or os.environ.get("GOOGLE_CLOUD_PROJECT")
+        firebase_admin.initialize_app(cred, {"projectId": project_id} if project_id else {})
 
 
 def get_db():
