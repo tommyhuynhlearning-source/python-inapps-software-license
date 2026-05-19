@@ -1,0 +1,20 @@
+# Python
+backend/venv/
+backend/__pycache__/
+backend/.env
+*.pyc
+
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# Firebase
+.firebase/
+firebase-debug.log
+
+# Env
+.env
+.env.local
+
+# Claude Code project settings (contains credentials)
+.claude/settings.json
