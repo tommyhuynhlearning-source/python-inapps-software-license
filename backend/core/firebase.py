@@ -171,7 +171,8 @@ class _Collection:
             headers=_auth_header(self._db._creds),
             timeout=30,
         )
-        r.raise_for_status()
+        if not r.is_success:
+            raise RuntimeError(f"Firestore {r.status_code}: {r.text}")
         return [_Doc(d) for d in r.json().get("documents", [])]
 
     def document(self, doc_id: str = None) -> _DocRef:
