@@ -1,3 +1,5 @@
+from typing import Optional
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from core.firebase import get_db
@@ -9,7 +11,7 @@ class License(BaseModel):
     key: str
     product: str
     owner: str
-    expires_at: str | None = None
+    expires_at: Optional[str] = None
     active: bool = True
 
 

@@ -1,3 +1,5 @@
+from typing import Optional
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from core.firebase import get_db
@@ -9,7 +11,7 @@ class Device(BaseModel):
     name: str
     license_id: str
     hardware_id: str
-    registered_at: str | None = None
+    registered_at: Optional[str] = None
     active: bool = True
 
 

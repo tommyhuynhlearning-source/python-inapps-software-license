@@ -1,9 +1,11 @@
+from typing import List
+
 from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
     firebase_project_id: str = ""
-    cors_origins: list[str] = ["http://localhost:5173"]
+    cors_origins: List[str] = ["http://localhost:5173", "*"]
 
     class Config:
         env_file = ".env"

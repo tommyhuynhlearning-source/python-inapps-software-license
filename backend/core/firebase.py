@@ -1,11 +1,20 @@
+import json
+import os
+import tempfile
+
 import firebase_admin
 from firebase_admin import credentials, firestore
 
 
 def init_firebase():
     if not firebase_admin._apps:
-        # Uses Application Default Credentials (firebase login / ADC)
-        # No service account key required
+        creds_json = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS_JSON")
+        if creds_json:
+            # Vercel: write credentials JSON from env var to a temp file for ADC
+            tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False)
+            tmp.write(creds_json)
+            tmp.close()
+            os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = tmp.name
         cred = credentials.ApplicationDefault()
         firebase_admin.initialize_app(cred)
 

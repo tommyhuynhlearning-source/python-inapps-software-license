@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from core.firebase import get_db
@@ -8,9 +10,9 @@ router = APIRouter(prefix="/api/security", tags=["security"])
 class SecurityEvent(BaseModel):
     device_id: str
     license_id: str
-    event_type: str  # e.g. "tamper", "revoke", "alert"
+    event_type: str
     description: str
-    severity: str = "info"  # info | warning | critical
+    severity: str = "info"
 
 
 @router.get("/events")
@@ -22,7 +24,6 @@ async def list_events():
 
 @router.post("/events", status_code=201)
 async def create_event(payload: SecurityEvent):
-    from datetime import datetime, timezone
     db = get_db()
     ref = db.collection("security_events").document()
     data = {**payload.model_dump(), "created_at": datetime.now(timezone.utc).isoformat()}
