@@ -1,14 +1,73 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 
-const fmt = (v) => (v == null || v === '' ? '—' : v)
-const fmtDate = (ts) => ts ? new Date(ts).toLocaleDateString('vi-VN') : '—'
+const TEAMS = ['BD', 'Dev', 'Marketing', 'HR']
+
+const Chevron = ({ open }) => (
+  <svg
+    width="16" height="16" viewBox="0 0 16 16" fill="none"
+    style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s', flexShrink: 0 }}
+  >
+    <path d="M4 6l4 4 4-4" stroke="#9ca3af" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+)
+
+const InitialAvatar = ({ name }) => (
+  <div style={{
+    width: 32, height: 32, borderRadius: '50%',
+    background: '#f3f4f6', color: '#6b7280',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    fontSize: 13, fontWeight: 600, flexShrink: 0,
+  }}>
+    {name ? name[0].toUpperCase() : '?'}
+  </div>
+)
+
+const isExpiringSoon = (dateStr) => {
+  if (!dateStr) return false
+  const d = new Date(dateStr)
+  if (isNaN(d)) return false
+  const diff = d - Date.now()
+  return diff > 0 && diff < 30 * 24 * 60 * 60 * 1000
+}
+
+const FilterBar = ({ teams, active, onTeam, search, onSearch, count, placeholder }) => (
+  <div style={{ display: 'flex', alignItems: 'center', gap: 2, marginBottom: 4, flexWrap: 'wrap' }}>
+    {['Tất cả', ...teams].map(t => (
+      <button key={t} onClick={() => onTeam(t)} style={{
+        padding: '4px 12px', borderRadius: 20, border: 'none', cursor: 'pointer',
+        fontSize: 13, fontWeight: active === t ? 500 : 400,
+        background: active === t ? '#000' : 'transparent',
+        color: active === t ? '#fff' : '#374151',
+      }}>{t}</button>
+    ))}
+    <input
+      value={search} onChange={e => onSearch(e.target.value)}
+      placeholder={placeholder}
+      style={{
+        marginLeft: 8, border: 'none', outline: 'none', fontSize: 13,
+        color: '#374151', background: 'transparent', width: 180,
+      }}
+    />
+    <span style={{ fontSize: 13, color: '#9ca3af', marginLeft: 4 }}>{count} records</span>
+    <button style={{
+      marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4,
+      background: 'none', border: 'none', cursor: 'pointer',
+      color: '#4f46e5', fontSize: 13, fontWeight: 500,
+    }}>
+      <span style={{ fontSize: 18, lineHeight: 1 }}>+</span> Thêm mới
+    </button>
+  </div>
+)
 
 export default function License() {
   const { getToken } = useAuth()
   const [licenses, setLicenses] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [teamFilter, setTeamFilter] = useState('Tất cả')
+  const [search, setSearch] = useState('')
+  const [expanded, setExpanded] = useState(null)
 
   useEffect(() => {
     getToken()
@@ -23,50 +82,76 @@ export default function License() {
       .finally(() => setLoading(false))
   }, [])
 
-  if (loading) return <p>Loading...</p>
-  if (error) return <p style={{ color: 'red' }}>{error}</p>
+  if (loading) return <div style={{ color: '#9ca3af', padding: '40px 0' }}>Loading...</div>
+  if (error) return <div style={{ color: '#ef4444', padding: '16px' }}>{error}</div>
+
+  const expiringSoon = licenses.filter(l => isExpiringSoon(l.ngayHetHan)).length
+
+  const filtered = licenses.filter(l => {
+    if (teamFilter !== 'Tất cả' && l.team !== teamFilter) return false
+    if (search && !l.tenPhanMem?.toLowerCase().includes(search.toLowerCase())) return false
+    return true
+  })
 
   return (
     <div>
-      <h2>Licenses</h2>
-      {licenses.length === 0 ? (
-        <p>Không có dữ liệu.</p>
-      ) : (
-        <div style={{ overflowX: 'auto' }}>
-          <table width="100%" cellPadding={8} style={{ borderCollapse: 'collapse', fontSize: '0.9rem' }}>
-            <thead>
-              <tr style={{ background: '#f5f5f5' }}>
-                <th align="left">Phần mềm</th>
-                <th align="left">Team</th>
-                <th align="left">Người quản lý</th>
-                <th align="left">Loại TK</th>
-                <th align="left">Loại chi phí</th>
-                <th align="left">Chi phí/tháng</th>
-                <th align="left">Chi phí/năm</th>
-                <th align="left">Hết hạn</th>
-                <th align="left">SL</th>
-                <th align="left">Ngày tạo</th>
-              </tr>
-            </thead>
-            <tbody>
-              {licenses.map(l => (
-                <tr key={l.id} style={{ borderBottom: '1px solid #eee' }}>
-                  <td>{fmt(l.tenPhanMem)}</td>
-                  <td>{fmt(l.team)}</td>
-                  <td>{fmt(l.nguoiQuanLy)}</td>
-                  <td>{fmt(l.loaiTaiKhoan)}</td>
-                  <td>{fmt(l.loaiChiPhi)}</td>
-                  <td>{fmt(l.chiPhiHangThang)}</td>
-                  <td>{fmt(l.chiPhiHangNam)}</td>
-                  <td>{fmt(l.ngayHetHan)}</td>
-                  <td>{fmt(l.soLuongLicense)}</td>
-                  <td>{fmtDate(l.submittedAt)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <div style={{ display: 'flex', gap: 48, marginBottom: 32, alignItems: 'flex-end' }}>
+        <div>
+          <div style={{ fontSize: 48, fontWeight: 700, lineHeight: 1, letterSpacing: '-2px' }}>{licenses.length}</div>
+          <div style={{ fontSize: 13, color: '#6b7280', marginTop: 6 }}>Phần mềm</div>
         </div>
-      )}
+        <div>
+          <div style={{ fontSize: 48, fontWeight: 700, lineHeight: 1, letterSpacing: '-2px' }}>{expiringSoon}</div>
+          <div style={{ fontSize: 13, color: '#6b7280', marginTop: 6 }}>Sắp hết hạn</div>
+        </div>
+      </div>
+
+      <FilterBar
+        teams={TEAMS} active={teamFilter} onTeam={setTeamFilter}
+        search={search} onSearch={setSearch} count={filtered.length}
+        placeholder="Tìm phần mềm..."
+      />
+
+      <div style={{ borderTop: '1px solid #e5e7eb', marginTop: 8 }}>
+        {filtered.length === 0 ? (
+          <div style={{ padding: '32px 0', color: '#9ca3af', textAlign: 'center' }}>Không có dữ liệu.</div>
+        ) : filtered.map(l => (
+          <div key={l.id} style={{ borderBottom: '1px solid #e5e7eb' }}>
+            <div
+              onClick={() => setExpanded(expanded === l.id ? null : l.id)}
+              style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', cursor: 'pointer' }}
+            >
+              <InitialAvatar name={l.tenPhanMem} />
+              <span style={{ flex: 1, fontSize: 14, fontWeight: 500, color: '#111827' }}>
+                {l.tenPhanMem || '—'}
+              </span>
+              <span style={{ fontSize: 14, color: '#6b7280', minWidth: 24, textAlign: 'right' }}>
+                {l.soLuongLicense || ''}
+              </span>
+              <span style={{ fontSize: 14, color: '#374151', minWidth: 100, textAlign: 'right' }}>
+                {l.chiPhiHangNam ? `$${Number(l.chiPhiHangNam).toLocaleString()}/năm` : ''}
+              </span>
+              <Chevron open={expanded === l.id} />
+            </div>
+            {expanded === l.id && (
+              <div style={{
+                padding: '12px 44px 16px',
+                background: '#fafafa',
+                fontSize: 13, color: '#374151',
+                display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px 24px',
+                borderTop: '1px solid #f3f4f6',
+              }}>
+                <div><span style={{ color: '#9ca3af' }}>Team: </span>{l.team || '—'}</div>
+                <div><span style={{ color: '#9ca3af' }}>Người quản lý: </span>{l.nguoiQuanLy || '—'}</div>
+                <div><span style={{ color: '#9ca3af' }}>Loại tài khoản: </span>{l.loaiTaiKhoan || '—'}</div>
+                <div><span style={{ color: '#9ca3af' }}>Loại chi phí: </span>{l.loaiChiPhi || '—'}</div>
+                <div><span style={{ color: '#9ca3af' }}>Chi phí/tháng: </span>{l.chiPhiHangThang || '—'}</div>
+                <div><span style={{ color: '#9ca3af' }}>Hết hạn: </span>{l.ngayHetHan || '—'}</div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

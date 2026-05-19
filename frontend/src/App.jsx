@@ -6,55 +6,122 @@ import Device from './pages/Device'
 import Security from './pages/Security'
 import Login from './pages/Login'
 
-const tabs = [
-  { path: '/license', label: 'License' },
-  { path: '/device', label: 'Device' },
-  { path: '/security', label: 'Security' },
-]
+const S = {
+  root: {
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif',
+    minHeight: '100vh',
+    background: '#fff',
+    color: '#111827',
+  },
+  header: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: '0 40px',
+    height: 52,
+    borderBottom: '1px solid #f3f4f6',
+  },
+  logo: {
+    fontSize: 15,
+    fontWeight: 700,
+    color: '#111827',
+    letterSpacing: '-0.3px',
+  },
+  headerRight: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+  },
+  avatar: {
+    width: 30,
+    height: 30,
+    borderRadius: '50%',
+    background: '#059669',
+    color: '#fff',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: 12,
+    fontWeight: 600,
+    flexShrink: 0,
+  },
+  userName: {
+    fontSize: 13,
+    color: '#111827',
+    fontWeight: 500,
+  },
+  logoutBtn: {
+    fontSize: 13,
+    color: '#374151',
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    padding: '4px 0',
+  },
+  nav: {
+    display: 'flex',
+    padding: '0 40px',
+    borderBottom: '1px solid #e5e7eb',
+  },
+  container: {
+    maxWidth: 1100,
+    margin: '0 auto',
+    padding: '32px 40px',
+  },
+}
 
 export default function App() {
   const { user } = useAuth()
 
-  if (user === undefined) return <p style={{ padding: '2rem', fontFamily: 'sans-serif' }}>Loading...</p>
+  if (user === undefined) return <div style={{ padding: 40, color: '#9ca3af', fontFamily: S.root.fontFamily }}>Loading...</div>
   if (user === null) return <Login />
 
+  const initial = (user.displayName || user.email)[0].toUpperCase()
+  const displayName = user.displayName || user.email.split('@')[0]
+
   return (
-    <div style={{ fontFamily: 'sans-serif', maxWidth: 960, margin: '0 auto', padding: '1rem' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-        <h1 style={{ margin: 0 }}>InApps Software License</h1>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <span style={{ color: '#666', fontSize: '0.9rem' }}>{user.email}</span>
-          <button
-            onClick={signOutUser}
-            style={{ padding: '0.4rem 0.8rem', cursor: 'pointer', border: '1px solid #ddd', borderRadius: 4 }}
-          >
-            Đăng xuất
-          </button>
+    <div style={S.root}>
+      <header style={S.header}>
+        <span style={S.logo}>InApps</span>
+        <div style={S.headerRight}>
+          <div style={S.avatar}>{initial}</div>
+          <span style={S.userName}>{displayName}</span>
+          <button style={S.logoutBtn} onClick={signOutUser}>Đăng xuất</button>
         </div>
-      </div>
-      <nav style={{ display: 'flex', gap: '1rem', borderBottom: '2px solid #eee', marginBottom: '1.5rem' }}>
-        {tabs.map(({ path, label }) => (
+      </header>
+
+      <nav style={S.nav}>
+        {[
+          { path: '/license', label: 'Licenses' },
+          { path: '/device', label: 'Devices' },
+          { path: '/security', label: 'Security' },
+        ].map(({ path, label }) => (
           <NavLink
             key={path}
             to={path}
             style={({ isActive }) => ({
-              padding: '0.5rem 1rem',
+              padding: '14px 16px',
               textDecoration: 'none',
-              fontWeight: isActive ? 700 : 400,
-              borderBottom: isActive ? '2px solid #0070f3' : '2px solid transparent',
-              color: isActive ? '#0070f3' : '#333',
+              fontSize: 14,
+              fontWeight: 500,
+              color: isActive ? '#111827' : '#9ca3af',
+              borderBottom: isActive ? '2px solid #111827' : '2px solid transparent',
+              marginBottom: -1,
             })}
           >
             {label}
           </NavLink>
         ))}
       </nav>
-      <Routes>
-        <Route path="/" element={<Navigate to="/license" replace />} />
-        <Route path="/license" element={<License />} />
-        <Route path="/device" element={<Device />} />
-        <Route path="/security" element={<Security />} />
-      </Routes>
+
+      <div style={S.container}>
+        <Routes>
+          <Route path="/" element={<Navigate to="/license" replace />} />
+          <Route path="/license" element={<License />} />
+          <Route path="/device" element={<Device />} />
+          <Route path="/security" element={<Security />} />
+        </Routes>
+      </div>
     </div>
   )
 }
