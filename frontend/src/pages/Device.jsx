@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 
+const fmt = (v) => (v == null || v === '' ? '—' : v)
+const fmtDate = (ts) => ts ? new Date(ts).toLocaleDateString('vi-VN') : '—'
+
 export default function Device() {
   const { getToken } = useAuth()
   const [devices, setDevices] = useState([])
@@ -27,28 +30,34 @@ export default function Device() {
     <div>
       <h2>Devices</h2>
       {devices.length === 0 ? (
-        <p>No devices registered.</p>
+        <p>Không có dữ liệu.</p>
       ) : (
-        <table width="100%" cellPadding={8} style={{ borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ background: '#f5f5f5' }}>
-              <th align="left">Name</th>
-              <th align="left">Hardware ID</th>
-              <th align="left">License ID</th>
-              <th align="left">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {devices.map(d => (
-              <tr key={d.id} style={{ borderBottom: '1px solid #eee' }}>
-                <td>{d.name}</td>
-                <td>{d.hardware_id}</td>
-                <td>{d.license_id}</td>
-                <td>{d.active ? 'Active' : 'Inactive'}</td>
+        <div style={{ overflowX: 'auto' }}>
+          <table width="100%" cellPadding={8} style={{ borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+            <thead>
+              <tr style={{ background: '#f5f5f5' }}>
+                <th align="left">Thiết bị</th>
+                <th align="left">Loại máy</th>
+                <th align="left">Nhân sự dùng</th>
+                <th align="left">Team</th>
+                <th align="left">Ghi chú</th>
+                <th align="left">Ngày tạo</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {devices.map(d => (
+                <tr key={d.id} style={{ borderBottom: '1px solid #eee' }}>
+                  <td>{fmt(d.tenThietBi)}</td>
+                  <td>{fmt(d.loaiMay)}</td>
+                  <td>{fmt(d.nhanSuSuDung)}</td>
+                  <td>{fmt(d.team)}</td>
+                  <td>{fmt(d.ghiChu)}</td>
+                  <td>{fmtDate(d.submittedAt)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   )

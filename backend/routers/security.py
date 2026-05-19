@@ -19,7 +19,7 @@ class SecurityEvent(BaseModel):
 @router.get("/events")
 async def list_events(token: str = Depends(get_token)):
     db = get_db(token)
-    docs = db.collection("security_records").order_by("created_at", direction="DESCENDING").stream()
+    docs = db.collection("security_records").order_by("submittedAt", direction="DESCENDING").stream()
     return [{"id": doc.id, **doc.to_dict()} for doc in docs]
 
 
