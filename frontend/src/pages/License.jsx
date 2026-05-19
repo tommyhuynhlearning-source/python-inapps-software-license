@@ -1,17 +1,27 @@
 import { useEffect, useState } from 'react'
+import { useAuth } from '../context/AuthContext'
 
 export default function License() {
+  const { getToken } = useAuth()
   const [licenses, setLicenses] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   useEffect(() => {
-    fetch('/api/licenses/')
-      .then(r => r.json())
+    getToken()
+      .then(token => fetch('/api/licenses/', { headers: { Authorization: `Bearer ${token}` } }))
+      .then(r => {
+        if (r.status === 403) throw new Error('Bạn không có quyền truy cập.')
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        return r.json()
+      })
       .then(data => setLicenses(data))
+      .catch(err => setError(err.message))
       .finally(() => setLoading(false))
   }, [])
 
   if (loading) return <p>Loading...</p>
+  if (error) return <p style={{ color: 'red' }}>{error}</p>
 
   return (
     <div>

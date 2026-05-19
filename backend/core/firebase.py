@@ -1,43 +1,11 @@
-import json
 import os
 import uuid
-
 
 FIRESTORE_BASE = "https://firestore.googleapis.com/v1"
 
 
-def _make_credentials():
-    import httpx  # noqa: F401 — ensure httpx available early
-    from google.auth.transport.requests import Request
-    from google.oauth2.credentials import Credentials
-
-    raw = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS_JSON")
-    if raw:
-        data = json.loads(raw)
-        creds = Credentials(
-            token=None,
-            refresh_token=data["refresh_token"],
-            client_id=data["client_id"],
-            client_secret=data["client_secret"],
-            token_uri="https://oauth2.googleapis.com/token",
-            scopes=["https://www.googleapis.com/auth/cloud-platform"],
-        )
-    else:
-        import google.auth
-        creds, _ = google.auth.default(
-            scopes=["https://www.googleapis.com/auth/cloud-platform"]
-        )
-    if not getattr(creds, "token", None):
-        from google.auth.transport.requests import Request
-        creds.refresh(Request())
-    return creds
-
-
-def _auth_header(creds) -> dict:
-    from google.auth.transport.requests import Request
-    if not creds.valid:
-        creds.refresh(Request())
-    return {"Authorization": f"Bearer {creds.token}"}
+def _auth_header(token: str) -> dict:
+    return {"Authorization": f"Bearer {token}"}
 
 
 # ---------- value encoding / decoding ----------
@@ -89,16 +57,16 @@ class _Doc:
 
 
 class _DocRef:
-    def __init__(self, url: str, doc_id: str, creds):
+    def __init__(self, url: str, doc_id: str, token: str):
         self._url = url
         self.id = doc_id
-        self._creds = creds
+        self._token = token
         self._raw = None
         self.exists = False
 
     def get(self) -> "_DocRef":
         import httpx
-        r = httpx.get(self._url, headers=_auth_header(self._creds), timeout=30)
+        r = httpx.get(self._url, headers=_auth_header(self._token), timeout=30)
         if r.status_code == 404:
             self.exists = False
         else:
@@ -113,7 +81,7 @@ class _DocRef:
     def set(self, data: dict):
         import httpx
         r = httpx.patch(
-            self._url, headers=_auth_header(self._creds),
+            self._url, headers=_auth_header(self._token),
             json=_encode_fields(data), timeout=30,
         )
         r.raise_for_status()
@@ -122,14 +90,14 @@ class _DocRef:
         import httpx
         params = [("updateMask.fieldPaths", k) for k in data]
         r = httpx.patch(
-            self._url, headers=_auth_header(self._creds),
+            self._url, headers=_auth_header(self._token),
             json=_encode_fields(data), params=params, timeout=30,
         )
         r.raise_for_status()
 
     def delete(self):
         import httpx
-        r = httpx.delete(self._url, headers=_auth_header(self._creds), timeout=30)
+        r = httpx.delete(self._url, headers=_auth_header(self._token), timeout=30)
         r.raise_for_status()
 
 
@@ -151,7 +119,7 @@ class _OrderedCollection:
                 ],
             }
         }
-        r = httpx.post(url, headers=_auth_header(db._creds), json=query, timeout=30)
+        r = httpx.post(url, headers=_auth_header(db._token), json=query, timeout=30)
         r.raise_for_status()
         return [_Doc(item["document"]) for item in r.json() if "document" in item]
 
@@ -168,7 +136,7 @@ class _Collection:
         import httpx
         r = httpx.get(
             f"{self._db._base}/{self._name}",
-            headers=_auth_header(self._db._creds),
+            headers=_auth_header(self._db._token),
             timeout=30,
         )
         if not r.is_success:
@@ -178,16 +146,16 @@ class _Collection:
     def document(self, doc_id: str = None) -> _DocRef:
         if doc_id is None:
             doc_id = uuid.uuid4().hex
-        return _DocRef(self._doc_url(doc_id), doc_id, self._db._creds)
+        return _DocRef(self._doc_url(doc_id), doc_id, self._db._token)
 
     def order_by(self, field: str, direction: str = "ASCENDING") -> _OrderedCollection:
         return _OrderedCollection(self, field, direction)
 
 
 class FirestoreDB:
-    def __init__(self, project_id: str, creds):
+    def __init__(self, project_id: str, token: str):
         self._project = project_id
-        self._creds = creds
+        self._token = token
         self._base = (
             f"{FIRESTORE_BASE}/projects/{project_id}/databases/(default)/documents"
         )
@@ -196,6 +164,6 @@ class FirestoreDB:
         return _Collection(self, name)
 
 
-def get_db() -> FirestoreDB:
+def get_db(token: str) -> FirestoreDB:
     project_id = os.environ.get("FIREBASE_PROJECT_ID", "")
-    return FirestoreDB(project_id, _make_credentials())
+    return FirestoreDB(project_id, token)

@@ -1,19 +1,29 @@
 import { useEffect, useState } from 'react'
+import { useAuth } from '../context/AuthContext'
 
 const SEVERITY_COLOR = { info: '#0070f3', warning: '#f5a623', critical: '#e00' }
 
 export default function Security() {
+  const { getToken } = useAuth()
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   useEffect(() => {
-    fetch('/api/security/events')
-      .then(r => r.json())
+    getToken()
+      .then(token => fetch('/api/security/events', { headers: { Authorization: `Bearer ${token}` } }))
+      .then(r => {
+        if (r.status === 403) throw new Error('Bạn không có quyền truy cập.')
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        return r.json()
+      })
       .then(data => setEvents(data))
+      .catch(err => setError(err.message))
       .finally(() => setLoading(false))
   }, [])
 
   if (loading) return <p>Loading...</p>
+  if (error) return <p style={{ color: 'red' }}>{error}</p>
 
   return (
     <div>
