@@ -1,4 +1,3 @@
-import os
 import uuid
 
 FIRESTORE_BASE = "https://firestore.googleapis.com/v1"
@@ -165,5 +164,5 @@ class FirestoreDB:
 
 
 def get_db(token: str) -> FirestoreDB:
-    project_id = os.environ.get("FIREBASE_PROJECT_ID", "")
-    return FirestoreDB(project_id, token)
+    from core.config import settings
+    return FirestoreDB(settings.firebase_project_id, token)
