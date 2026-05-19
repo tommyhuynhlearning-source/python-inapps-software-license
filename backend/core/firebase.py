@@ -2,14 +2,15 @@ import json
 import os
 import uuid
 
-import httpx
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
 
 FIRESTORE_BASE = "https://firestore.googleapis.com/v1"
 
 
-def _make_credentials() -> Credentials:
+def _make_credentials():
+    import httpx  # noqa: F401 — ensure httpx available early
+    from google.auth.transport.requests import Request
+    from google.oauth2.credentials import Credentials
+
     raw = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS_JSON")
     if raw:
         data = json.loads(raw)
@@ -27,11 +28,13 @@ def _make_credentials() -> Credentials:
             scopes=["https://www.googleapis.com/auth/datastore"]
         )
     if not getattr(creds, "token", None):
+        from google.auth.transport.requests import Request
         creds.refresh(Request())
     return creds
 
 
-def _auth_header(creds: Credentials) -> dict:
+def _auth_header(creds) -> dict:
+    from google.auth.transport.requests import Request
     if not creds.valid:
         creds.refresh(Request())
     return {"Authorization": f"Bearer {creds.token}"}
@@ -40,14 +43,14 @@ def _auth_header(creds: Credentials) -> dict:
 # ---------- value encoding / decoding ----------
 
 def _decode(v: dict):
-    if "stringValue" in v:   return v["stringValue"]
-    if "booleanValue" in v:  return v["booleanValue"]
-    if "integerValue" in v:  return int(v["integerValue"])
-    if "doubleValue" in v:   return float(v["doubleValue"])
-    if "nullValue" in v:     return None
+    if "stringValue" in v:    return v["stringValue"]
+    if "booleanValue" in v:   return v["booleanValue"]
+    if "integerValue" in v:   return int(v["integerValue"])
+    if "doubleValue" in v:    return float(v["doubleValue"])
+    if "nullValue" in v:      return None
     if "timestampValue" in v: return v["timestampValue"]
-    if "mapValue" in v:      return _decode_fields(v["mapValue"].get("fields", {}))
-    if "arrayValue" in v:    return [_decode(x) for x in v["arrayValue"].get("values", [])]
+    if "mapValue" in v:       return _decode_fields(v["mapValue"].get("fields", {}))
+    if "arrayValue" in v:     return [_decode(x) for x in v["arrayValue"].get("values", [])]
     return v
 
 
@@ -75,7 +78,7 @@ def _encode_fields(data: dict) -> dict:
 # ---------- Firestore REST wrapper ----------
 
 class _Doc:
-    def __init__(self, raw: dict, project_id: str):
+    def __init__(self, raw: dict):
         name = raw.get("name", "")
         self.id = name.rsplit("/", 1)[-1]
         self._fields = raw.get("fields", {})
@@ -86,7 +89,7 @@ class _Doc:
 
 
 class _DocRef:
-    def __init__(self, url: str, doc_id: str, creds: Credentials):
+    def __init__(self, url: str, doc_id: str, creds):
         self._url = url
         self.id = doc_id
         self._creds = creds
@@ -94,6 +97,7 @@ class _DocRef:
         self.exists = False
 
     def get(self) -> "_DocRef":
+        import httpx
         r = httpx.get(self._url, headers=_auth_header(self._creds), timeout=30)
         if r.status_code == 404:
             self.exists = False
@@ -107,20 +111,24 @@ class _DocRef:
         return _decode_fields(self._raw.get("fields", {})) if self._raw else {}
 
     def set(self, data: dict):
-        body = _encode_fields(data)
-        r = httpx.patch(self._url, headers=_auth_header(self._creds), json=body, timeout=30)
+        import httpx
+        r = httpx.patch(
+            self._url, headers=_auth_header(self._creds),
+            json=_encode_fields(data), timeout=30,
+        )
         r.raise_for_status()
 
     def update(self, data: dict):
-        body = _encode_fields(data)
+        import httpx
         params = [("updateMask.fieldPaths", k) for k in data]
         r = httpx.patch(
-            self._url, headers=_auth_header(self._creds), json=body,
-            params=params, timeout=30,
+            self._url, headers=_auth_header(self._creds),
+            json=_encode_fields(data), params=params, timeout=30,
         )
         r.raise_for_status()
 
     def delete(self):
+        import httpx
         r = httpx.delete(self._url, headers=_auth_header(self._creds), timeout=30)
         r.raise_for_status()
 
@@ -132,6 +140,7 @@ class _OrderedCollection:
         self._direction = direction
 
     def stream(self):
+        import httpx
         db = self._coll._db
         url = f"{db._base}:runQuery"
         query = {
@@ -144,11 +153,7 @@ class _OrderedCollection:
         }
         r = httpx.post(url, headers=_auth_header(db._creds), json=query, timeout=30)
         r.raise_for_status()
-        return [
-            _Doc(item["document"], db._project)
-            for item in r.json()
-            if "document" in item
-        ]
+        return [_Doc(item["document"]) for item in r.json() if "document" in item]
 
 
 class _Collection:
@@ -160,13 +165,14 @@ class _Collection:
         return f"{self._db._base}/{self._name}/{doc_id}"
 
     def stream(self):
+        import httpx
         r = httpx.get(
             f"{self._db._base}/{self._name}",
             headers=_auth_header(self._db._creds),
             timeout=30,
         )
         r.raise_for_status()
-        return [_Doc(d, self._db._project) for d in r.json().get("documents", [])]
+        return [_Doc(d) for d in r.json().get("documents", [])]
 
     def document(self, doc_id: str = None) -> _DocRef:
         if doc_id is None:
@@ -178,7 +184,7 @@ class _Collection:
 
 
 class FirestoreDB:
-    def __init__(self, project_id: str, creds: Credentials):
+    def __init__(self, project_id: str, creds):
         self._project = project_id
         self._creds = creds
         self._base = (
