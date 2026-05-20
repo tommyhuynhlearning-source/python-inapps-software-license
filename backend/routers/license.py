@@ -9,11 +9,15 @@ router = APIRouter(prefix="/api/licenses", tags=["licenses"])
 
 
 class License(BaseModel):
-    key: str
-    product: str
-    owner: str
-    expires_at: Optional[str] = None
-    active: bool = True
+    tenPhanMem: str
+    team: Optional[str] = None
+    soLuongLicense: Optional[int] = None
+    chiPhiHangNam: Optional[float] = None
+    chiPhiHangThang: Optional[float] = None
+    loaiChiPhi: Optional[str] = None
+    loaiTaiKhoan: Optional[str] = None
+    nguoiQuanLy: Optional[str] = None
+    ngayHetHan: Optional[str] = None
 
 
 @router.get("/")

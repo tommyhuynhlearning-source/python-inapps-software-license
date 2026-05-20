@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -9,11 +9,12 @@ router = APIRouter(prefix="/api/security", tags=["security"])
 
 
 class SecurityEvent(BaseModel):
-    device_id: str
-    license_id: str
-    event_type: str
-    description: str
-    severity: str = "info"
+    tenService: str
+    email: Optional[str] = None
+    loaiCredential: Optional[str] = None
+    vaiTro: Optional[str] = None
+    nguoiNamGiu: Optional[str] = None
+    team: Optional[str] = None
 
 
 @router.get("/events")
@@ -27,7 +28,7 @@ async def list_events(token: str = Depends(get_token)):
 async def create_event(payload: SecurityEvent, token: str = Depends(get_token)):
     db = get_db(token)
     ref = db.collection("security_records").document()
-    data = {**payload.model_dump(), "created_at": datetime.now(timezone.utc).isoformat()}
+    data = payload.model_dump()
     ref.set(data)
     return {"id": ref.id, **data}
 

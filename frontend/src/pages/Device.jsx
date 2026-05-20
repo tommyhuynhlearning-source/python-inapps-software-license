@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
+import Modal, { Field, Input, Select } from '../components/Modal'
 
 const TEAMS = ['BD', 'Dev', 'Marketing', 'HR']
 
@@ -28,6 +29,8 @@ const TypeBadge = ({ type }) => {
   )
 }
 
+const EMPTY_FORM = { tenThietBi: '', loaiMay: '', nhanSuSuDung: '', team: '' }
+
 export default function Device() {
   const { getToken } = useAuth()
   const [devices, setDevices] = useState([])
@@ -36,6 +39,9 @@ export default function Device() {
   const [teamFilter, setTeamFilter] = useState('Tất cả')
   const [search, setSearch] = useState('')
   const [expanded, setExpanded] = useState(null)
+  const [showModal, setShowModal] = useState(false)
+  const [form, setForm] = useState(EMPTY_FORM)
+  const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
     getToken()
@@ -49,6 +55,28 @@ export default function Device() {
       .catch(err => setError(err.message))
       .finally(() => setLoading(false))
   }, [])
+
+  const handleSubmit = async e => {
+    e.preventDefault()
+    setSubmitting(true)
+    try {
+      const token = await getToken()
+      const res = await fetch('/api/devices/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(form),
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const created = await res.json()
+      setDevices(prev => [...prev, created])
+      setShowModal(false)
+      setForm(EMPTY_FORM)
+    } catch (err) {
+      alert('Lỗi: ' + err.message)
+    } finally {
+      setSubmitting(false)
+    }
+  }
 
   if (loading) return <div style={{ color: '#9ca3af', padding: '40px 0' }}>Loading...</div>
   if (error) return <div style={{ color: '#ef4444', padding: '16px' }}>{error}</div>
@@ -106,7 +134,7 @@ export default function Device() {
           }}
         />
         <span style={{ fontSize: 13, color: '#9ca3af', marginLeft: 4 }}>{filtered.length} records</span>
-        <button style={{
+        <button onClick={() => setShowModal(true)} style={{
           marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4,
           background: 'none', border: 'none', cursor: 'pointer',
           color: '#4f46e5', fontSize: 13, fontWeight: 500,
@@ -114,6 +142,31 @@ export default function Device() {
           <span style={{ fontSize: 18, lineHeight: 1 }}>+</span> Thêm mới
         </button>
       </div>
+
+      {showModal && (
+        <Modal title="Thêm thiết bị mới" onClose={() => setShowModal(false)} onSubmit={handleSubmit} submitting={submitting}>
+          <Field label="Tên thiết bị *">
+            <Input required value={form.tenThietBi} onChange={e => setForm(f => ({ ...f, tenThietBi: e.target.value }))} placeholder="VD: MacBook Pro 14" />
+          </Field>
+          <Field label="Loại máy">
+            <Select value={form.loaiMay} onChange={e => setForm(f => ({ ...f, loaiMay: e.target.value }))}>
+              <option value="">-- Chọn loại --</option>
+              <option value="Laptop">Laptop</option>
+              <option value="Phone">Phone</option>
+              <option value="Monitor">Monitor</option>
+            </Select>
+          </Field>
+          <Field label="Nhân sự sử dụng">
+            <Input value={form.nhanSuSuDung} onChange={e => setForm(f => ({ ...f, nhanSuSuDung: e.target.value }))} placeholder="Tên nhân sự" />
+          </Field>
+          <Field label="Team">
+            <Select value={form.team} onChange={e => setForm(f => ({ ...f, team: e.target.value }))}>
+              <option value="">-- Chọn team --</option>
+              {TEAMS.map(t => <option key={t} value={t}>{t}</option>)}
+            </Select>
+          </Field>
+        </Modal>
+      )}
 
       <div style={{ borderTop: '1px solid #e5e7eb', marginTop: 8 }}>
         {Object.entries(groups).length === 0 ? (

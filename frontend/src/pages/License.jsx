@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
+import Modal, { Field, Input, Select } from '../components/Modal'
 
 const TEAMS = ['BD', 'Dev', 'Marketing', 'HR']
 
@@ -31,7 +32,7 @@ const isExpiringSoon = (dateStr) => {
   return diff > 0 && diff < 30 * 24 * 60 * 60 * 1000
 }
 
-const FilterBar = ({ teams, active, onTeam, search, onSearch, count, placeholder }) => (
+const FilterBar = ({ teams, active, onTeam, search, onSearch, count, placeholder, onAdd }) => (
   <div style={{ display: 'flex', alignItems: 'center', gap: 2, marginBottom: 4, flexWrap: 'wrap' }}>
     {['Tất cả', ...teams].map(t => (
       <button key={t} onClick={() => onTeam(t)} style={{
@@ -50,7 +51,7 @@ const FilterBar = ({ teams, active, onTeam, search, onSearch, count, placeholder
       }}
     />
     <span style={{ fontSize: 13, color: '#9ca3af', marginLeft: 4 }}>{count} records</span>
-    <button style={{
+    <button onClick={onAdd} style={{
       marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4,
       background: 'none', border: 'none', cursor: 'pointer',
       color: '#4f46e5', fontSize: 13, fontWeight: 500,
@@ -60,6 +61,11 @@ const FilterBar = ({ teams, active, onTeam, search, onSearch, count, placeholder
   </div>
 )
 
+const EMPTY_FORM = {
+  tenPhanMem: '', team: '', soLuongLicense: '', chiPhiHangNam: '',
+  chiPhiHangThang: '', loaiChiPhi: '', loaiTaiKhoan: '', nguoiQuanLy: '', ngayHetHan: '',
+}
+
 export default function License() {
   const { getToken } = useAuth()
   const [licenses, setLicenses] = useState([])
@@ -68,6 +74,9 @@ export default function License() {
   const [teamFilter, setTeamFilter] = useState('Tất cả')
   const [search, setSearch] = useState('')
   const [expanded, setExpanded] = useState(null)
+  const [showModal, setShowModal] = useState(false)
+  const [form, setForm] = useState(EMPTY_FORM)
+  const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
     getToken()
@@ -81,6 +90,34 @@ export default function License() {
       .catch(err => setError(err.message))
       .finally(() => setLoading(false))
   }, [])
+
+  const handleSubmit = async e => {
+    e.preventDefault()
+    setSubmitting(true)
+    try {
+      const token = await getToken()
+      const body = {
+        ...form,
+        soLuongLicense: form.soLuongLicense ? Number(form.soLuongLicense) : null,
+        chiPhiHangNam: form.chiPhiHangNam ? Number(form.chiPhiHangNam) : null,
+        chiPhiHangThang: form.chiPhiHangThang ? Number(form.chiPhiHangThang) : null,
+      }
+      const res = await fetch('/api/licenses/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(body),
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const created = await res.json()
+      setLicenses(prev => [...prev, created])
+      setShowModal(false)
+      setForm(EMPTY_FORM)
+    } catch (err) {
+      alert('Lỗi: ' + err.message)
+    } finally {
+      setSubmitting(false)
+    }
+  }
 
   if (loading) return <div style={{ color: '#9ca3af', padding: '40px 0' }}>Loading...</div>
   if (error) return <div style={{ color: '#ef4444', padding: '16px' }}>{error}</div>
@@ -109,8 +146,43 @@ export default function License() {
       <FilterBar
         teams={TEAMS} active={teamFilter} onTeam={setTeamFilter}
         search={search} onSearch={setSearch} count={filtered.length}
-        placeholder="Tìm phần mềm..."
+        placeholder="Tìm phần mềm..." onAdd={() => setShowModal(true)}
       />
+
+      {showModal && (
+        <Modal title="Thêm phần mềm mới" onClose={() => setShowModal(false)} onSubmit={handleSubmit} submitting={submitting}>
+          <Field label="Tên phần mềm *">
+            <Input required value={form.tenPhanMem} onChange={e => setForm(f => ({ ...f, tenPhanMem: e.target.value }))} placeholder="VD: Figma" />
+          </Field>
+          <Field label="Team">
+            <Select value={form.team} onChange={e => setForm(f => ({ ...f, team: e.target.value }))}>
+              <option value="">-- Chọn team --</option>
+              {TEAMS.map(t => <option key={t} value={t}>{t}</option>)}
+            </Select>
+          </Field>
+          <Field label="Người quản lý">
+            <Input value={form.nguoiQuanLy} onChange={e => setForm(f => ({ ...f, nguoiQuanLy: e.target.value }))} placeholder="Tên người quản lý" />
+          </Field>
+          <Field label="Số lượng license">
+            <Input type="number" min="0" value={form.soLuongLicense} onChange={e => setForm(f => ({ ...f, soLuongLicense: e.target.value }))} placeholder="0" />
+          </Field>
+          <Field label="Loại tài khoản">
+            <Input value={form.loaiTaiKhoan} onChange={e => setForm(f => ({ ...f, loaiTaiKhoan: e.target.value }))} placeholder="VD: Business, Enterprise..." />
+          </Field>
+          <Field label="Loại chi phí">
+            <Input value={form.loaiChiPhi} onChange={e => setForm(f => ({ ...f, loaiChiPhi: e.target.value }))} placeholder="VD: Hàng năm, Hàng tháng..." />
+          </Field>
+          <Field label="Chi phí hàng năm ($)">
+            <Input type="number" min="0" value={form.chiPhiHangNam} onChange={e => setForm(f => ({ ...f, chiPhiHangNam: e.target.value }))} placeholder="0" />
+          </Field>
+          <Field label="Chi phí hàng tháng ($)">
+            <Input type="number" min="0" value={form.chiPhiHangThang} onChange={e => setForm(f => ({ ...f, chiPhiHangThang: e.target.value }))} placeholder="0" />
+          </Field>
+          <Field label="Ngày hết hạn">
+            <Input type="date" value={form.ngayHetHan} onChange={e => setForm(f => ({ ...f, ngayHetHan: e.target.value }))} />
+          </Field>
+        </Modal>
+      )}
 
       <div style={{ borderTop: '1px solid #e5e7eb', marginTop: 8 }}>
         {filtered.length === 0 ? (

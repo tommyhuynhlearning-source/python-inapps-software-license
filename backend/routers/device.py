@@ -9,11 +9,10 @@ router = APIRouter(prefix="/api/devices", tags=["devices"])
 
 
 class Device(BaseModel):
-    name: str
-    license_id: str
-    hardware_id: str
-    registered_at: Optional[str] = None
-    active: bool = True
+    tenThietBi: str
+    loaiMay: Optional[str] = None
+    nhanSuSuDung: Optional[str] = None
+    team: Optional[str] = None
 
 
 @router.get("/")

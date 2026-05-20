@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
+import Modal, { Field, Input, Select } from '../components/Modal'
 
 const TEAMS = ['BD', 'Dev', 'Marketing', 'HR']
 
@@ -19,6 +20,8 @@ const ShieldIcon = () => (
   </svg>
 )
 
+const EMPTY_FORM = { tenService: '', email: '', loaiCredential: '', vaiTro: '', nguoiNamGiu: '', team: '' }
+
 export default function Security() {
   const { getToken } = useAuth()
   const [records, setRecords] = useState([])
@@ -27,6 +30,9 @@ export default function Security() {
   const [teamFilter, setTeamFilter] = useState('Tất cả')
   const [search, setSearch] = useState('')
   const [expanded, setExpanded] = useState(null)
+  const [showModal, setShowModal] = useState(false)
+  const [form, setForm] = useState(EMPTY_FORM)
+  const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
     getToken()
@@ -40,6 +46,28 @@ export default function Security() {
       .catch(err => setError(err.message))
       .finally(() => setLoading(false))
   }, [])
+
+  const handleSubmit = async e => {
+    e.preventDefault()
+    setSubmitting(true)
+    try {
+      const token = await getToken()
+      const res = await fetch('/api/security/events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(form),
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const created = await res.json()
+      setRecords(prev => [created, ...prev])
+      setShowModal(false)
+      setForm(EMPTY_FORM)
+    } catch (err) {
+      alert('Lỗi: ' + err.message)
+    } finally {
+      setSubmitting(false)
+    }
+  }
 
   if (loading) return <div style={{ color: '#9ca3af', padding: '40px 0' }}>Loading...</div>
   if (error) return <div style={{ color: '#ef4444', padding: '16px' }}>{error}</div>
@@ -98,7 +126,7 @@ export default function Security() {
           }}
         />
         <span style={{ fontSize: 13, color: '#9ca3af', marginLeft: 4 }}>{filtered.length} records</span>
-        <button style={{
+        <button onClick={() => setShowModal(true)} style={{
           marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4,
           background: 'none', border: 'none', cursor: 'pointer',
           color: '#4f46e5', fontSize: 13, fontWeight: 500,
@@ -106,6 +134,32 @@ export default function Security() {
           <span style={{ fontSize: 18, lineHeight: 1 }}>+</span> Thêm mới
         </button>
       </div>
+
+      {showModal && (
+        <Modal title="Thêm credential mới" onClose={() => setShowModal(false)} onSubmit={handleSubmit} submitting={submitting}>
+          <Field label="Tên service *">
+            <Input required value={form.tenService} onChange={e => setForm(f => ({ ...f, tenService: e.target.value }))} placeholder="VD: AWS, GitHub..." />
+          </Field>
+          <Field label="Email">
+            <Input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="email@example.com" />
+          </Field>
+          <Field label="Loại credential">
+            <Input value={form.loaiCredential} onChange={e => setForm(f => ({ ...f, loaiCredential: e.target.value }))} placeholder="VD: API Key, OAuth..." />
+          </Field>
+          <Field label="Vai trò">
+            <Input value={form.vaiTro} onChange={e => setForm(f => ({ ...f, vaiTro: e.target.value }))} placeholder="VD: Admin, Developer..." />
+          </Field>
+          <Field label="Người nắm giữ">
+            <Input value={form.nguoiNamGiu} onChange={e => setForm(f => ({ ...f, nguoiNamGiu: e.target.value }))} placeholder="Tên người nắm giữ" />
+          </Field>
+          <Field label="Team">
+            <Select value={form.team} onChange={e => setForm(f => ({ ...f, team: e.target.value }))}>
+              <option value="">-- Chọn team --</option>
+              {TEAMS.map(t => <option key={t} value={t}>{t}</option>)}
+            </Select>
+          </Field>
+        </Modal>
+      )}
 
       <div style={{ borderTop: '1px solid #e5e7eb', marginTop: 8 }}>
         {Object.entries(groups).length === 0 ? (

@@ -4,6 +4,7 @@ import { signOutUser } from './firebase'
 import License from './pages/License'
 import Device from './pages/Device'
 import Security from './pages/Security'
+import ODC from './pages/ODC'
 import Login from './pages/Login'
 
 const S = {
@@ -94,6 +95,7 @@ export default function App() {
         {[
           { path: '/license', label: 'Licenses' },
           { path: '/device', label: 'Devices' },
+          { path: '/odc', label: 'ODC' },
           { path: '/security', label: 'Security' },
         ].map(({ path, label }) => (
           <NavLink
@@ -120,6 +122,7 @@ export default function App() {
           <Route path="/license" element={<License />} />
           <Route path="/device" element={<Device />} />
           <Route path="/security" element={<Security />} />
+          <Route path="/odc" element={<ODC />} />
         </Routes>
       </div>
     </div>
