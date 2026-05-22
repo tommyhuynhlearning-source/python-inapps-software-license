@@ -18,4 +18,5 @@ firebase-debug.log
 
 # Claude Code project settings (contains credentials)
 .claude/settings.json
+.mcp.json
 .vercel
