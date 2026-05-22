@@ -12,6 +12,8 @@ _MCP_HEADERS = None
 def _get_mcp_config():
     global _MCP_URL, _MCP_HEADERS
     if _MCP_URL is None:
+        if not settings.odoo_user or not settings.odoo_api_key:
+            raise RuntimeError("ODOO_USER and ODOO_API_KEY must be set in environment")
         token = base64.b64encode(
             f"{settings.odoo_user}:{settings.odoo_api_key}".encode()
         ).decode()
