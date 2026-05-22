@@ -1,5 +1,3 @@
-from typing import Optional
-
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from core.firebase import get_db
@@ -10,14 +8,14 @@ router = APIRouter(prefix="/api/licenses", tags=["licenses"])
 
 class License(BaseModel):
     tenPhanMem: str
-    team: Optional[str] = None
-    soLuongLicense: Optional[int] = None
-    chiPhiHangNam: Optional[float] = None
-    chiPhiHangThang: Optional[float] = None
-    loaiChiPhi: Optional[str] = None
-    loaiTaiKhoan: Optional[str] = None
-    nguoiQuanLy: Optional[str] = None
-    ngayHetHan: Optional[str] = None
+    team: str | None = None
+    soLuongLicense: int | None = None
+    chiPhiHangNam: float | None = None
+    chiPhiHangThang: float | None = None
+    loaiChiPhi: str | None = None
+    loaiTaiKhoan: str | None = None
+    nguoiQuanLy: str | None = None
+    ngayHetHan: str | None = None
 
 
 @router.get("/")

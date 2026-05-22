@@ -32,7 +32,17 @@ const isExpiringSoon = (dateStr) => {
   return diff > 0 && diff < 30 * 24 * 60 * 60 * 1000
 }
 
-const FilterBar = ({ teams, active, onTeam, search, onSearch, count, placeholder, onAdd }) => (
+const groupByService = (list) => {
+  const map = {}
+  for (const l of list) {
+    const key = l.tenPhanMem || '(Chưa đặt tên)'
+    if (!map[key]) map[key] = []
+    map[key].push(l)
+  }
+  return Object.entries(map).map(([name, accounts]) => ({ name, accounts }))
+}
+
+const FilterBar = ({ teams, active, onTeam, search, onSearch, count, onAdd }) => (
   <div style={{ display: 'flex', alignItems: 'center', gap: 2, marginBottom: 4, flexWrap: 'wrap' }}>
     {['Tất cả', ...teams].map(t => (
       <button key={t} onClick={() => onTeam(t)} style={{
@@ -44,13 +54,13 @@ const FilterBar = ({ teams, active, onTeam, search, onSearch, count, placeholder
     ))}
     <input
       value={search} onChange={e => onSearch(e.target.value)}
-      placeholder={placeholder}
+      placeholder="Tìm dịch vụ..."
       style={{
         marginLeft: 8, border: 'none', outline: 'none', fontSize: 13,
         color: '#374151', background: 'transparent', width: 180,
       }}
     />
-    <span style={{ fontSize: 13, color: '#9ca3af', marginLeft: 4 }}>{count} records</span>
+    <span style={{ fontSize: 13, color: '#9ca3af', marginLeft: 4 }}>{count} dịch vụ</span>
     <button onClick={onAdd} style={{
       marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4,
       background: 'none', border: 'none', cursor: 'pointer',
@@ -122,6 +132,8 @@ export default function License() {
   if (loading) return <div style={{ color: '#9ca3af', padding: '40px 0' }}>Loading...</div>
   if (error) return <div style={{ color: '#ef4444', padding: '16px' }}>{error}</div>
 
+  const totalServices = groupByService(licenses).length
+  const totalAccounts = licenses.length
   const expiringSoon = licenses.filter(l => isExpiringSoon(l.ngayHetHan)).length
 
   const filtered = licenses.filter(l => {
@@ -129,13 +141,18 @@ export default function License() {
     if (search && !l.tenPhanMem?.toLowerCase().includes(search.toLowerCase())) return false
     return true
   })
+  const services = groupByService(filtered)
 
   return (
     <div>
       <div style={{ display: 'flex', gap: 48, marginBottom: 32, alignItems: 'flex-end' }}>
         <div>
-          <div style={{ fontSize: 48, fontWeight: 700, lineHeight: 1, letterSpacing: '-2px' }}>{licenses.length}</div>
-          <div style={{ fontSize: 13, color: '#6b7280', marginTop: 6 }}>Phần mềm</div>
+          <div style={{ fontSize: 48, fontWeight: 700, lineHeight: 1, letterSpacing: '-2px' }}>{totalServices}</div>
+          <div style={{ fontSize: 13, color: '#6b7280', marginTop: 6 }}>Dịch vụ</div>
+        </div>
+        <div>
+          <div style={{ fontSize: 48, fontWeight: 700, lineHeight: 1, letterSpacing: '-2px' }}>{totalAccounts}</div>
+          <div style={{ fontSize: 13, color: '#6b7280', marginTop: 6 }}>Tài khoản</div>
         </div>
         <div>
           <div style={{ fontSize: 48, fontWeight: 700, lineHeight: 1, letterSpacing: '-2px' }}>{expiringSoon}</div>
@@ -145,14 +162,14 @@ export default function License() {
 
       <FilterBar
         teams={TEAMS} active={teamFilter} onTeam={setTeamFilter}
-        search={search} onSearch={setSearch} count={filtered.length}
-        placeholder="Tìm phần mềm..." onAdd={() => setShowModal(true)}
+        search={search} onSearch={setSearch} count={services.length}
+        onAdd={() => setShowModal(true)}
       />
 
       {showModal && (
-        <Modal title="Thêm phần mềm mới" onClose={() => setShowModal(false)} onSubmit={handleSubmit} submitting={submitting}>
-          <Field label="Tên phần mềm *">
-            <Input required value={form.tenPhanMem} onChange={e => setForm(f => ({ ...f, tenPhanMem: e.target.value }))} placeholder="VD: Figma" />
+        <Modal title="Thêm tài khoản mới" onClose={() => setShowModal(false)} onSubmit={handleSubmit} submitting={submitting}>
+          <Field label="Tên dịch vụ *">
+            <Input required value={form.tenPhanMem} onChange={e => setForm(f => ({ ...f, tenPhanMem: e.target.value }))} placeholder="VD: Claude Pro, Figma..." />
           </Field>
           <Field label="Team">
             <Select value={form.team} onChange={e => setForm(f => ({ ...f, team: e.target.value }))}>
@@ -163,11 +180,11 @@ export default function License() {
           <Field label="Người quản lý">
             <Input value={form.nguoiQuanLy} onChange={e => setForm(f => ({ ...f, nguoiQuanLy: e.target.value }))} placeholder="Tên người quản lý" />
           </Field>
+          <Field label="Loại tài khoản">
+            <Input value={form.loaiTaiKhoan} onChange={e => setForm(f => ({ ...f, loaiTaiKhoan: e.target.value }))} placeholder="VD: Pro, Business, Enterprise..." />
+          </Field>
           <Field label="Số lượng license">
             <Input type="number" min="0" value={form.soLuongLicense} onChange={e => setForm(f => ({ ...f, soLuongLicense: e.target.value }))} placeholder="0" />
-          </Field>
-          <Field label="Loại tài khoản">
-            <Input value={form.loaiTaiKhoan} onChange={e => setForm(f => ({ ...f, loaiTaiKhoan: e.target.value }))} placeholder="VD: Business, Enterprise..." />
           </Field>
           <Field label="Loại chi phí">
             <Input value={form.loaiChiPhi} onChange={e => setForm(f => ({ ...f, loaiChiPhi: e.target.value }))} placeholder="VD: Hàng năm, Hàng tháng..." />
@@ -185,44 +202,74 @@ export default function License() {
       )}
 
       <div style={{ borderTop: '1px solid #e5e7eb', marginTop: 8 }}>
-        {filtered.length === 0 ? (
+        {services.length === 0 ? (
           <div style={{ padding: '32px 0', color: '#9ca3af', textAlign: 'center' }}>Không có dữ liệu.</div>
-        ) : filtered.map(l => (
-          <div key={l.id} style={{ borderBottom: '1px solid #e5e7eb' }}>
-            <div
-              onClick={() => setExpanded(expanded === l.id ? null : l.id)}
-              style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', cursor: 'pointer' }}
-            >
-              <InitialAvatar name={l.tenPhanMem} />
-              <span style={{ flex: 1, fontSize: 14, fontWeight: 500, color: '#111827' }}>
-                {l.tenPhanMem || '—'}
-              </span>
-              <span style={{ fontSize: 14, color: '#6b7280', minWidth: 24, textAlign: 'right' }}>
-                {l.soLuongLicense || ''}
-              </span>
-              <span style={{ fontSize: 14, color: '#374151', minWidth: 100, textAlign: 'right' }}>
-                {l.chiPhiHangNam ? `$${Number(l.chiPhiHangNam).toLocaleString()}/năm` : ''}
-              </span>
-              <Chevron open={expanded === l.id} />
-            </div>
-            {expanded === l.id && (
-              <div style={{
-                padding: '12px 44px 16px',
-                background: '#fafafa',
-                fontSize: 13, color: '#374151',
-                display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px 24px',
-                borderTop: '1px solid #f3f4f6',
-              }}>
-                <div><span style={{ color: '#9ca3af' }}>Team: </span>{l.team || '—'}</div>
-                <div><span style={{ color: '#9ca3af' }}>Người quản lý: </span>{l.nguoiQuanLy || '—'}</div>
-                <div><span style={{ color: '#9ca3af' }}>Loại tài khoản: </span>{l.loaiTaiKhoan || '—'}</div>
-                <div><span style={{ color: '#9ca3af' }}>Loại chi phí: </span>{l.loaiChiPhi || '—'}</div>
-                <div><span style={{ color: '#9ca3af' }}>Chi phí/tháng: </span>{l.chiPhiHangThang || '—'}</div>
-                <div><span style={{ color: '#9ca3af' }}>Hết hạn: </span>{l.ngayHetHan || '—'}</div>
+        ) : services.map(({ name, accounts }) => {
+          const isOpen = expanded === name
+          const totalYear = accounts.reduce((s, a) => s + (a.chiPhiHangNam || 0), 0)
+          const anyExpiring = accounts.some(a => isExpiringSoon(a.ngayHetHan))
+
+          return (
+            <div key={name} style={{ borderBottom: '1px solid #e5e7eb' }}>
+              <div
+                onClick={() => setExpanded(isOpen ? null : name)}
+                style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', cursor: 'pointer' }}
+              >
+                <InitialAvatar name={name} />
+                <span style={{ flex: 1, fontSize: 14, fontWeight: 500, color: '#111827' }}>{name}</span>
+                {anyExpiring && (
+                  <span style={{ fontSize: 11, color: '#f59e0b', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 10, padding: '1px 8px' }}>
+                    Sắp hết hạn
+                  </span>
+                )}
+                <span style={{ fontSize: 13, color: '#9ca3af' }}>
+                  {accounts.length} tài khoản
+                </span>
+                {totalYear > 0 && (
+                  <span style={{ fontSize: 13, color: '#374151', minWidth: 110, textAlign: 'right' }}>
+                    ${Number(totalYear).toLocaleString()}/năm
+                  </span>
+                )}
+                <Chevron open={isOpen} />
               </div>
-            )}
-          </div>
-        ))}
+
+              {isOpen && (
+                <div style={{ background: '#fafafa', borderTop: '1px solid #f3f4f6', paddingBottom: 8 }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                    <thead>
+                      <tr>
+                        <th style={{ padding: '8px 44px 6px', textAlign: 'left', fontWeight: 500, color: '#9ca3af' }}>Team</th>
+                        <th style={{ padding: '8px 12px 6px', textAlign: 'left', fontWeight: 500, color: '#9ca3af' }}>Loại tài khoản</th>
+                        <th style={{ padding: '8px 12px 6px', textAlign: 'left', fontWeight: 500, color: '#9ca3af' }}>Người quản lý</th>
+                        <th style={{ padding: '8px 12px 6px', textAlign: 'left', fontWeight: 500, color: '#9ca3af' }}>Chi phí</th>
+                        <th style={{ padding: '8px 12px 6px', textAlign: 'left', fontWeight: 500, color: '#9ca3af' }}>Hết hạn</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {accounts.map(acc => (
+                        <tr key={acc.id} style={{ borderTop: '1px solid #f3f4f6' }}>
+                          <td style={{ padding: '9px 44px', color: '#374151' }}>{acc.team || '—'}</td>
+                          <td style={{ padding: '9px 12px', color: '#374151' }}>{acc.loaiTaiKhoan || '—'}</td>
+                          <td style={{ padding: '9px 12px', color: '#374151' }}>{acc.nguoiQuanLy || '—'}</td>
+                          <td style={{ padding: '9px 12px', color: '#374151' }}>
+                            {acc.chiPhiHangNam
+                              ? `$${Number(acc.chiPhiHangNam).toLocaleString()}/năm`
+                              : acc.chiPhiHangThang
+                                ? `$${Number(acc.chiPhiHangThang).toLocaleString()}/tháng`
+                                : '—'}
+                          </td>
+                          <td style={{ padding: '9px 12px', color: isExpiringSoon(acc.ngayHetHan) ? '#f59e0b' : '#374151', fontWeight: isExpiringSoon(acc.ngayHetHan) ? 500 : 400 }}>
+                            {acc.ngayHetHan || '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )
+        })}
       </div>
     </div>
   )

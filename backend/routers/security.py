@@ -1,5 +1,3 @@
-from typing import Optional
-
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from core.firebase import get_db
@@ -10,11 +8,11 @@ router = APIRouter(prefix="/api/security", tags=["security"])
 
 class SecurityEvent(BaseModel):
     tenService: str
-    email: Optional[str] = None
-    loaiCredential: Optional[str] = None
-    vaiTro: Optional[str] = None
-    nguoiNamGiu: Optional[str] = None
-    team: Optional[str] = None
+    email: str | None = None
+    loaiCredential: str | None = None
+    vaiTro: str | None = None
+    nguoiNamGiu: str | None = None
+    team: str | None = None
 
 
 @router.get("/events")

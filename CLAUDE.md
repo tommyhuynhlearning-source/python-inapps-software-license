@@ -4,11 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Software license management web app for InApps. Three main tabs: **License**, **Device**, **Security**.
+Software license management web app for InApps. Four main tabs: **License**, **Device**, **Security**, **ODC**.
 
-- **Backend:** Python (FastAPI) — REST API, runs on port 8000
+- **Backend:** Python 3.13 (FastAPI) — REST API, runs on port 8000
 - **Frontend:** React + Vite — SPA, runs on port 5173
 - **Database/Auth:** Firebase (Firestore + Firebase Auth), authenticated via Firebase CLI (no service account keys)
+- **Odoo integration:** ODC tab connects to Odoo 19 ERP via MCP HTTP endpoint (`https://erp.inapps.net/mcp/`)
 
 ## Commands
 
@@ -52,28 +53,31 @@ python-inapps-software-license/
 │   ├── main.py              # FastAPI app entry, mounts all routers
 │   ├── core/
 │   │   ├── config.py        # env vars / settings (pydantic BaseSettings)
-│   │   └── firebase.py      # Firebase Admin SDK init (uses ADC, not service account)
+│   │   ├── firebase.py      # Firebase Admin SDK init (uses ADC, not service account)
+│   │   └── odoo_client.py   # Odoo MCP adapter — _mcp_call(), list_tasks(), create_task()
 │   ├── routers/
 │   │   ├── license.py       # /api/licenses — CRUD
 │   │   ├── device.py        # /api/devices  — CRUD
-│   │   └── security.py      # /api/security — CRUD
+│   │   ├── security.py      # /api/security — CRUD
+│   │   └── odoo.py          # /api/odoo/tasks — GET list, POST create
 │   ├── models/              # Pydantic request/response schemas
 │   ├── requirements.txt
 │   └── .env                 # local env (not committed)
 ├── frontend/
 │   ├── src/
 │   │   ├── main.jsx         # React entry, router setup
-│   │   ├── App.jsx          # Tab layout shell (License / Device / Security)
+│   │   ├── App.jsx          # Tab layout shell (License / Device / Security / ODC)
 │   │   ├── pages/
 │   │   │   ├── License.jsx
 │   │   │   ├── Device.jsx
-│   │   │   └── Security.jsx
+│   │   │   ├── Security.jsx
+│   │   │   └── ODC.jsx      # ODC tab — tạo task Odoo (task list ẩn tạm, chỉ dùng test)
 │   │   ├── components/      # Shared UI components
 │   │   └── hooks/           # Custom React hooks (API calls, Firebase)
 │   ├── vite.config.js       # proxy /api → http://localhost:8000
 │   └── package.json
 └── .claude/
-    └── settings.json        # Project-level MCP servers (GitHub + Firebase)
+    └── settings.json        # Project-level MCP servers (GitHub + Firebase + Odoo)
 ```
 
 ## Key Patterns
@@ -83,6 +87,12 @@ python-inapps-software-license/
 **Firebase auth (no service account):** Firebase Admin SDK in the backend uses Application Default Credentials (`firebase login --reauth` or `GOOGLE_APPLICATION_CREDENTIALS` env pointing to a user credential file). Never use service account JSON keys — key creation is restricted by org policy.
 
 **Router structure:** Each tab maps 1-to-1 with a FastAPI router and a React page component. Add new features by extending the corresponding router + page pair.
+
+**Python 3.13 typing:** Use native syntax — `str | None`, `int | None`, `list[str]` — not `Optional[str]`, `List[str]`. Keep `from typing import Any` when needed (no native equivalent).
+
+**Odoo MCP integration:** All Odoo calls go through `_mcp_call()` in `backend/core/odoo_client.py`. It wraps HTTP POST to `https://erp.inapps.net/mcp/` with JSON-RPC 2.0 format and Basic auth (`odoo_user:odoo_api_key` from `.env`). Available tools: `odoo_search`, `odoo_create`, `odoo_write`, `odoo_get`, `odoo_count`, `odoo_fields`. Add new Odoo operations by calling `_mcp_call("odoo_<tool>", {...})`.
+
+**ODC page (current state):** Task list is hidden — only the create-task form is shown for testing the Odoo connection. `ODOO_PROJECT_IT_SERVICE = 72` is the Odoo project ID for "IT Service".
 
 ## MCP Servers (project-scoped)
 

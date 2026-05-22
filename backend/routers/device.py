@@ -1,5 +1,3 @@
-from typing import Optional
-
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from core.firebase import get_db
@@ -10,9 +8,9 @@ router = APIRouter(prefix="/api/devices", tags=["devices"])
 
 class Device(BaseModel):
     tenThietBi: str
-    loaiMay: Optional[str] = None
-    nhanSuSuDung: Optional[str] = None
-    team: Optional[str] = None
+    loaiMay: str | None = None
+    nhanSuSuDung: str | None = None
+    team: str | None = None
 
 
 @router.get("/")
