@@ -77,7 +77,7 @@ python-inapps-software-license/
 │   ├── vite.config.js       # proxy /api → http://localhost:8000
 │   └── package.json
 └── .claude/
-    └── settings.json        # Project-level MCP servers (GitHub + Firebase + Odoo)
+    └── settings.json        # Project-level MCP servers (GitHub + Firebase + Vercel + AWS)
 ```
 
 ## Key Patterns
@@ -101,3 +101,48 @@ Configured in `.claude/settings.json` — applies **only to this project**. Do n
 - **GitHub MCP:** Set `GITHUB_PERSONAL_ACCESS_TOKEN` in `.claude/settings.json` before use. Generate a PAT from GitHub → Settings → Developer settings → Personal access tokens.
 - **Firebase MCP:** Requires `firebase login` to be run first in the terminal. Uses Firebase CLI session — no service account key needed (org policy blocks key creation).
 - **Vercel MCP:** Remote MCP via OAuth at `https://mcp.vercel.com`. First use: run `/mcp` inside Claude Code to trigger the OAuth flow and authorize with your Vercel account. Supports monitoring deployments, projects, and logs. Docs: [vercel.com/docs/agent-resources/vercel-mcp](https://vercel.com/docs/agent-resources/vercel-mcp)
+- **AWS MCP:** Uses `@yawlabs/aws-mcp` (25 tools, calls any AWS API). Credentials (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`) are set directly in `.claude/settings.json` — no AWS CLI required. Region: `ap-southeast-1`.
+
+## Allowed Actions
+
+Claude được phép thực hiện các actions sau **mà không cần hỏi lại**:
+
+### Code & Files
+- Đọc, chỉnh sửa, tạo file trong project
+- Chạy `pytest` (backend tests)
+- Chạy `npm run lint` (frontend lint)
+- Chạy `uvicorn` hoặc `npm run dev` để start dev server
+
+### MCP — Firebase
+- Đọc/ghi Firestore collections (licenses, devices, security)
+- Kiểm tra Firebase Auth users
+- Xem Firebase project config
+
+### MCP — GitHub
+- Đọc issues, PRs, commits
+- Tạo PR, comment trên PR
+- Xem repo file content
+
+### MCP — Vercel
+- Xem danh sách deployments và trạng thái
+- Đọc build logs và runtime logs
+- Kiểm tra project config
+
+### MCP — AWS
+- Gọi AWS APIs đọc (List*, Describe*, Get*)
+- Xem S3 buckets, EC2 instances, Lambda functions
+- Kiểm tra IAM permissions, CloudWatch logs
+
+### MCP — Odoo
+- Tìm kiếm và đọc records Odoo
+- Tạo task trong project IT Service (project ID 72)
+- Cập nhật task status/fields
+
+---
+
+Claude **phải hỏi trước** khi:
+- Push code lên git hoặc merge PR
+- Xóa dữ liệu trong Firestore hoặc Odoo
+- Tạo/xóa AWS resources (S3 bucket, EC2, v.v.)
+- Thay đổi `.env` files
+- Deploy lên Vercel production
