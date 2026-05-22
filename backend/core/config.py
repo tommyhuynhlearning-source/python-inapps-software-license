@@ -10,6 +10,10 @@ class Settings(BaseSettings):
     odoo_user: str = ""
     odoo_api_key: str = ""
 
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_to: str = "anh.huynh@inapps.net"
+
     class Config:
         env_file = ".env"
 
