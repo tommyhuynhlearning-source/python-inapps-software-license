@@ -1,13 +1,10 @@
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from core.auth import get_token
 from core.email_utils import send_task_notification
 from core.odoo_client import create_task, list_tasks
-
-_executor = ThreadPoolExecutor(max_workers=2)
 
 router = APIRouter(prefix="/api/odoo", tags=["odoo"])
 
@@ -30,8 +27,7 @@ async def post_task(payload: TaskCreate, token: str = Depends(get_token)):
         raise HTTPException(status_code=422, detail="Task name is required")
     try:
         task = create_task(payload.name.strip())
-        loop = asyncio.get_event_loop()
-        loop.run_in_executor(_executor, send_task_notification, task["name"], task["id"])
+        await asyncio.to_thread(send_task_notification, task["name"], task["id"])
         return task
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
