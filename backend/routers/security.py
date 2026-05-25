@@ -18,7 +18,7 @@ class SecurityEvent(BaseModel):
 @router.get("/events")
 async def list_events(token: str = Depends(get_token)):
     db = get_db(token)
-    docs = db.collection("security_records").order_by("submittedAt", direction="DESCENDING").stream()
+    docs = await db.collection("security_records").order_by("submittedAt", direction="DESCENDING").stream()
     return [{"id": doc.id, **doc.to_dict()} for doc in docs]
 
 
@@ -27,7 +27,7 @@ async def create_event(payload: SecurityEvent, token: str = Depends(get_token)):
     db = get_db(token)
     ref = db.collection("security_records").document()
     data = payload.model_dump()
-    ref.set(data)
+    await ref.set(data)
     return {"id": ref.id, **data}
 
 
@@ -35,8 +35,8 @@ async def create_event(payload: SecurityEvent, token: str = Depends(get_token)):
 async def revoke_license(license_id: str, token: str = Depends(get_token)):
     db = get_db(token)
     doc_ref = db.collection("software_licenses").document(license_id)
-    doc = doc_ref.get()
+    doc = await doc_ref.get()
     if not doc.exists:
         raise HTTPException(status_code=404, detail="License not found")
-    doc_ref.update({"active": False})
+    await doc_ref.update({"active": False})
     return {"revoked": True, "license_id": license_id}

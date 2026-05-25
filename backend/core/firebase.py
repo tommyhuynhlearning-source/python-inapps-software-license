@@ -1,6 +1,9 @@
 import uuid
+import httpx
 
 FIRESTORE_BASE = "https://firestore.googleapis.com/v1"
+
+_client = httpx.AsyncClient(timeout=30)
 
 
 def _auth_header(token: str) -> dict:
@@ -63,9 +66,8 @@ class _DocRef:
         self._raw = None
         self.exists = False
 
-    def get(self) -> "_DocRef":
-        import httpx
-        r = httpx.get(self._url, headers=_auth_header(self._token), timeout=30)
+    async def get(self) -> "_DocRef":
+        r = await _client.get(self._url, headers=_auth_header(self._token))
         if r.status_code == 404:
             self.exists = False
         else:
@@ -77,26 +79,23 @@ class _DocRef:
     def to_dict(self) -> dict:
         return _decode_fields(self._raw.get("fields", {})) if self._raw else {}
 
-    def set(self, data: dict):
-        import httpx
-        r = httpx.patch(
+    async def set(self, data: dict):
+        r = await _client.patch(
             self._url, headers=_auth_header(self._token),
-            json=_encode_fields(data), timeout=30,
+            json=_encode_fields(data),
         )
         r.raise_for_status()
 
-    def update(self, data: dict):
-        import httpx
+    async def update(self, data: dict):
         params = [("updateMask.fieldPaths", k) for k in data]
-        r = httpx.patch(
+        r = await _client.patch(
             self._url, headers=_auth_header(self._token),
-            json=_encode_fields(data), params=params, timeout=30,
+            json=_encode_fields(data), params=params,
         )
         r.raise_for_status()
 
-    def delete(self):
-        import httpx
-        r = httpx.delete(self._url, headers=_auth_header(self._token), timeout=30)
+    async def delete(self):
+        r = await _client.delete(self._url, headers=_auth_header(self._token))
         r.raise_for_status()
 
 
@@ -106,8 +105,7 @@ class _OrderedCollection:
         self._field = field
         self._direction = direction
 
-    def stream(self):
-        import httpx
+    async def stream(self, limit: int = 500):
         db = self._coll._db
         url = f"{db._base}:runQuery"
         query = {
@@ -116,9 +114,10 @@ class _OrderedCollection:
                 "orderBy": [
                     {"field": {"fieldPath": self._field}, "direction": self._direction}
                 ],
+                "limit": limit,
             }
         }
-        r = httpx.post(url, headers=_auth_header(db._token), json=query, timeout=30)
+        r = await _client.post(url, headers=_auth_header(db._token), json=query)
         r.raise_for_status()
         return [_Doc(item["document"]) for item in r.json() if "document" in item]
 
@@ -131,12 +130,11 @@ class _Collection:
     def _doc_url(self, doc_id: str) -> str:
         return f"{self._db._base}/{self._name}/{doc_id}"
 
-    def stream(self):
-        import httpx
-        r = httpx.get(
+    async def stream(self, limit: int = 500):
+        r = await _client.get(
             f"{self._db._base}/{self._name}",
             headers=_auth_header(self._db._token),
-            timeout=30,
+            params={"pageSize": limit},
         )
         if not r.is_success:
             raise RuntimeError(f"Firestore {r.status_code}: {r.text}")

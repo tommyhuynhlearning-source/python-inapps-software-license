@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
+import { useData } from '../context/DataContext'
 import Modal, { Field, Input, Select } from '../components/Modal'
 
 const TEAMS = ['BD', 'Dev', 'Marketing', 'HR']
@@ -24,28 +25,13 @@ const EMPTY_FORM = { tenService: '', email: '', loaiCredential: '', vaiTro: '', 
 
 export default function Security() {
   const { getToken } = useAuth()
-  const [records, setRecords] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
+  const { records, setRecords } = useData()
   const [teamFilter, setTeamFilter] = useState('Tất cả')
   const [search, setSearch] = useState('')
   const [expanded, setExpanded] = useState(null)
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState(EMPTY_FORM)
   const [submitting, setSubmitting] = useState(false)
-
-  useEffect(() => {
-    getToken()
-      .then(token => fetch('/api/security/events', { headers: { Authorization: `Bearer ${token}` } }))
-      .then(r => {
-        if (r.status === 403) throw new Error('Bạn không có quyền truy cập.')
-        if (!r.ok) throw new Error(`HTTP ${r.status}`)
-        return r.json()
-      })
-      .then(data => setRecords(data))
-      .catch(err => setError(err.message))
-      .finally(() => setLoading(false))
-  }, [])
 
   const handleSubmit = async e => {
     e.preventDefault()
@@ -69,25 +55,22 @@ export default function Security() {
     }
   }
 
-  if (loading) return <div style={{ color: '#9ca3af', padding: '40px 0' }}>Loading...</div>
-  if (error) return <div style={{ color: '#ef4444', padding: '16px' }}>{error}</div>
+  const uniqueServices = useMemo(() => new Set(records.map(r => r.tenService).filter(Boolean)).size, [records])
+  const uniqueOwners = useMemo(() => new Set(records.map(r => r.nguoiNamGiu).filter(Boolean)).size, [records])
 
-  const uniqueServices = new Set(records.map(r => r.tenService).filter(Boolean)).size
-  const uniqueOwners = new Set(records.map(r => r.nguoiNamGiu).filter(Boolean)).size
-
-  const filtered = records.filter(r => {
+  const filtered = useMemo(() => records.filter(r => {
     if (teamFilter !== 'Tất cả' && r.team !== teamFilter) return false
     if (search && !r.tenService?.toLowerCase().includes(search.toLowerCase()) &&
         !r.nguoiNamGiu?.toLowerCase().includes(search.toLowerCase())) return false
     return true
-  })
+  }), [records, teamFilter, search])
 
-  const groups = filtered.reduce((acc, r) => {
+  const groups = useMemo(() => filtered.reduce((acc, r) => {
     const k = r.tenService || 'Khác'
     if (!acc[k]) acc[k] = []
     acc[k].push(r)
     return acc
-  }, {})
+  }, {}), [filtered])
 
   return (
     <div>

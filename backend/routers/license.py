@@ -21,7 +21,7 @@ class License(BaseModel):
 @router.get("/")
 async def list_licenses(token: str = Depends(get_token)):
     db = get_db(token)
-    docs = db.collection("software_licenses").stream()
+    docs = await db.collection("software_licenses").stream()
     return [{"id": doc.id, **doc.to_dict()} for doc in docs]
 
 
@@ -29,14 +29,14 @@ async def list_licenses(token: str = Depends(get_token)):
 async def create_license(payload: License, token: str = Depends(get_token)):
     db = get_db(token)
     ref = db.collection("software_licenses").document()
-    ref.set(payload.model_dump())
+    await ref.set(payload.model_dump())
     return {"id": ref.id, **payload.model_dump()}
 
 
 @router.get("/{license_id}")
 async def get_license(license_id: str, token: str = Depends(get_token)):
     db = get_db(token)
-    doc = db.collection("software_licenses").document(license_id).get()
+    doc = await db.collection("software_licenses").document(license_id).get()
     if not doc.exists:
         raise HTTPException(status_code=404, detail="License not found")
     return {"id": doc.id, **doc.to_dict()}
@@ -45,4 +45,4 @@ async def get_license(license_id: str, token: str = Depends(get_token)):
 @router.delete("/{license_id}", status_code=204)
 async def delete_license(license_id: str, token: str = Depends(get_token)):
     db = get_db(token)
-    db.collection("software_licenses").document(license_id).delete()
+    await db.collection("software_licenses").document(license_id).delete()

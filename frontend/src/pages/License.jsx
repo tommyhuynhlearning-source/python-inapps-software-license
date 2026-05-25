@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
+import { useData } from '../context/DataContext'
 import Modal, { Field, Input, Select } from '../components/Modal'
 
 const TEAMS = ['BD', 'Dev', 'Marketing', 'HR']
@@ -78,28 +79,13 @@ const EMPTY_FORM = {
 
 export default function License() {
   const { getToken } = useAuth()
-  const [licenses, setLicenses] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
+  const { licenses, setLicenses } = useData()
   const [teamFilter, setTeamFilter] = useState('Tất cả')
   const [search, setSearch] = useState('')
   const [expanded, setExpanded] = useState(null)
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState(EMPTY_FORM)
   const [submitting, setSubmitting] = useState(false)
-
-  useEffect(() => {
-    getToken()
-      .then(token => fetch('/api/licenses/', { headers: { Authorization: `Bearer ${token}` } }))
-      .then(r => {
-        if (r.status === 403) throw new Error('Bạn không có quyền truy cập.')
-        if (!r.ok) throw new Error(`HTTP ${r.status}`)
-        return r.json()
-      })
-      .then(data => setLicenses(data))
-      .catch(err => setError(err.message))
-      .finally(() => setLoading(false))
-  }, [])
 
   const handleSubmit = async e => {
     e.preventDefault()
@@ -129,19 +115,15 @@ export default function License() {
     }
   }
 
-  if (loading) return <div style={{ color: '#9ca3af', padding: '40px 0' }}>Loading...</div>
-  if (error) return <div style={{ color: '#ef4444', padding: '16px' }}>{error}</div>
-
-  const totalServices = groupByService(licenses).length
+  const totalServices = useMemo(() => groupByService(licenses).length, [licenses])
   const totalAccounts = licenses.length
-  const expiringSoon = licenses.filter(l => isExpiringSoon(l.ngayHetHan)).length
-
-  const filtered = licenses.filter(l => {
+  const expiringSoon = useMemo(() => licenses.filter(l => isExpiringSoon(l.ngayHetHan)).length, [licenses])
+  const filtered = useMemo(() => licenses.filter(l => {
     if (teamFilter !== 'Tất cả' && l.team !== teamFilter) return false
     if (search && !l.tenPhanMem?.toLowerCase().includes(search.toLowerCase())) return false
     return true
-  })
-  const services = groupByService(filtered)
+  }), [licenses, teamFilter, search])
+  const services = useMemo(() => groupByService(filtered), [filtered])
 
   return (
     <div>

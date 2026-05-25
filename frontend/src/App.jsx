@@ -1,5 +1,6 @@
 import { NavLink, Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
+import { DataProvider, useData } from './context/DataContext'
 import { signOutUser } from './firebase'
 import License from './pages/License'
 import Device from './pages/Device'
@@ -64,11 +65,23 @@ const S = {
     padding: '0 40px',
     borderBottom: '1px solid #e5e7eb',
   },
-  container: {
-    maxWidth: 1100,
-    margin: '0 auto',
-    padding: '32px 40px',
-  },
+}
+
+function AppContent() {
+  const { loading, error } = useData()
+  if (loading) return <div style={{ color: '#9ca3af', padding: '40px 0' }}>Loading...</div>
+  if (error) return <div style={{ color: '#ef4444', padding: '16px' }}>{error}</div>
+  return (
+    <div style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 40px' }}>
+      <Routes>
+        <Route path="/" element={<Navigate to="/license" replace />} />
+        <Route path="/license" element={<License />} />
+        <Route path="/device" element={<Device />} />
+        <Route path="/security" element={<Security />} />
+        <Route path="/odc" element={<ODC />} />
+      </Routes>
+    </div>
+  )
 }
 
 export default function App() {
@@ -116,15 +129,9 @@ export default function App() {
         ))}
       </nav>
 
-      <div style={S.container}>
-        <Routes>
-          <Route path="/" element={<Navigate to="/license" replace />} />
-          <Route path="/license" element={<License />} />
-          <Route path="/device" element={<Device />} />
-          <Route path="/security" element={<Security />} />
-          <Route path="/odc" element={<ODC />} />
-        </Routes>
-      </div>
+      <DataProvider>
+        <AppContent />
+      </DataProvider>
     </div>
   )
 }
