@@ -48,6 +48,20 @@ export default function ODC() {
       return next
     })
   }
+  const [inactiveEmails, setInactiveEmails] = useState(() => {
+    try {
+      const saved = localStorage.getItem('inactiveEmails')
+      return new Set(saved ? JSON.parse(saved) : [])
+    } catch { return new Set() }
+  })
+  const toggleStatus = (email) => {
+    setInactiveEmails(prev => {
+      const next = new Set(prev)
+      if (next.has(email)) next.delete(email); else next.add(email)
+      localStorage.setItem('inactiveEmails', JSON.stringify([...next]))
+      return next
+    })
+  }
   const [taskName, setTaskName] = useState('')
   const [creating, setCreating] = useState(false)
   const [createdTasks, setCreatedTasks] = useState([])
@@ -190,12 +204,13 @@ export default function ODC() {
                     <th style={{ textAlign: 'left', padding: '8px 16px', fontWeight: 600, color: '#374151', fontSize: 13 }}>Tên</th>
                     <th style={{ textAlign: 'left', padding: '8px 16px', fontWeight: 600, color: '#374151', fontSize: 13 }}>Email alias</th>
                     <th style={{ textAlign: 'left', padding: '8px 16px', fontWeight: 600, color: '#374151', fontSize: 13 }}>Loại</th>
+                    <th style={{ textAlign: 'left', padding: '8px 16px', fontWeight: 600, color: '#374151', fontSize: 13 }}>Status</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.length === 0 ? (
                     <tr>
-                      <td colSpan={4} style={{ padding: '16px', color: '#9ca3af', textAlign: 'center' }}>Không tìm thấy</td>
+                      <td colSpan={5} style={{ padding: '16px', color: '#9ca3af', textAlign: 'center' }}>Không tìm thấy</td>
                     </tr>
                   ) : filtered.map((a, i) => (
                     <tr
@@ -240,6 +255,41 @@ export default function ODC() {
                           >
                             <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#3b82f6', flexShrink: 0 }} />
                             ODC
+                          </span>
+                        )}
+                      </td>
+                      <td style={{ padding: '9px 16px' }}>
+                        {inactiveEmails.has(a.alias_email) ? (
+                          <span
+                            onClick={() => toggleStatus(a.alias_email)}
+                            title="Click để đổi sang Active"
+                            style={{
+                              display: 'inline-flex', alignItems: 'center', gap: 4,
+                              background: '#f3f4f6', color: '#6b7280',
+                              border: '1px solid #e5e7eb',
+                              borderRadius: 99, padding: '2px 8px',
+                              fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap',
+                              cursor: 'pointer', userSelect: 'none',
+                            }}
+                          >
+                            <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#9ca3af', flexShrink: 0 }} />
+                            Inactive
+                          </span>
+                        ) : (
+                          <span
+                            onClick={() => toggleStatus(a.alias_email)}
+                            title="Click để đổi sang Inactive"
+                            style={{
+                              display: 'inline-flex', alignItems: 'center', gap: 4,
+                              background: '#f0fdf4', color: '#15803d',
+                              border: '1px solid #bbf7d0',
+                              borderRadius: 99, padding: '2px 8px',
+                              fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap',
+                              cursor: 'pointer', userSelect: 'none',
+                            }}
+                          >
+                            <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#22c55e', flexShrink: 0 }} />
+                            Active
                           </span>
                         )}
                       </td>
