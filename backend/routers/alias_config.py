@@ -6,6 +6,7 @@ from core.firebase import get_db
 router = APIRouter(prefix="/api/alias-mail-config", tags=["alias-config"])
 COLLECTION = "alias-mail-config"
 DEFAULT = {"status": "active", "odc_type": "odc"}
+NON_ODC_DEFAULTS = {"legal@inapps.net", "vy.doan@inapps.net"}
 
 
 class ConfigEntry(BaseModel):
@@ -36,11 +37,14 @@ async def sync_config(payload: SyncPayload, token: str = Depends(get_token)):
     db = get_db(token)
     emails = set(payload.emails)
     existing_docs = await db.collection(COLLECTION).stream()
-    existing = {doc.id for doc in existing_docs}
+    existing = {doc.id: doc.to_dict() for doc in existing_docs}
 
     for email in emails:
         if email not in existing:
-            await db.collection(COLLECTION).document(email).set(DEFAULT.copy())
+            entry = {**DEFAULT, "odc_type": "non-odc"} if email in NON_ODC_DEFAULTS else DEFAULT.copy()
+            await db.collection(COLLECTION).document(email).set(entry)
+        elif email in NON_ODC_DEFAULTS and existing[email].get("odc_type") == "odc":
+            await db.collection(COLLECTION).document(email).update({"odc_type": "non-odc"})
 
     for email in existing:
         if email not in emails:
