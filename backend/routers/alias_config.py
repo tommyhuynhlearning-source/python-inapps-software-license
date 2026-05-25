@@ -39,15 +39,22 @@ async def sync_config(payload: SyncPayload, token: str = Depends(get_token)):
     existing_docs = await db.collection(COLLECTION).stream()
     existing = {doc.id: doc.to_dict() for doc in existing_docs}
 
+    created: dict = {}
+    corrected: dict = {}
+    deleted: list = []
+
     for email in emails:
         if email not in existing:
             entry = {**DEFAULT, "odc_type": "non-odc"} if email in NON_ODC_DEFAULTS else DEFAULT.copy()
             await db.collection(COLLECTION).document(email).set(entry)
+            created[email] = entry
         elif email in NON_ODC_DEFAULTS and existing[email].get("odc_type") == "odc":
             await db.collection(COLLECTION).document(email).update({"odc_type": "non-odc"})
+            corrected[email] = {**existing[email], "odc_type": "non-odc"}
 
     for email in existing:
         if email not in emails:
             await db.collection(COLLECTION).document(email).delete()
+            deleted.append(email)
 
-    return {"ok": True}
+    return {"created": created, "corrected": corrected, "deleted": deleted}

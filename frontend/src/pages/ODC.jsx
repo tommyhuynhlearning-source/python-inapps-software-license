@@ -73,11 +73,13 @@ export default function ODC() {
           body: JSON.stringify({ emails }),
         })
         if (!syncRes.ok) return
-        // Re-fetch config after sync to pick up newly created entries
-        const configRes = await fetch('/api/alias-mail-config', {
-          headers: { Authorization: `Bearer ${token}` },
+        const { created = {}, corrected = {}, deleted = [] } = await syncRes.json()
+        // Merge only changed entries — never overwrite existing state (avoids race with optimistic updates)
+        setAliasConfig(prev => {
+          const next = { ...prev, ...created, ...corrected }
+          for (const email of deleted) delete next[email]
+          return next
         })
-        if (configRes.ok) setAliasConfig(await configRes.json())
       } catch { /* non-critical */ }
     })()
   }, [aliases.data])
