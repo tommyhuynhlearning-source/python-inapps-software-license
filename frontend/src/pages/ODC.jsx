@@ -53,7 +53,7 @@ export default function ODC() {
         })
         if (!res.ok) return
         const data = await res.json()
-        if (!cancelled) setAliasConfig(data)
+        if (!cancelled) setAliasConfig(prev => ({ ...data, ...prev }))
       } catch { /* use defaults */ }
     })()
     return () => { cancelled = true }
