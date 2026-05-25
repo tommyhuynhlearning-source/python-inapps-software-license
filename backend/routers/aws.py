@@ -166,3 +166,21 @@ async def list_instances(token: str = Depends(get_token)):
         return instances
     except (BotoCoreError, ClientError) as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/dynamodb/alias-mail-aliases/items")
+async def list_alias_mail(token: str = Depends(get_token)):
+    try:
+        db = _boto("dynamodb")
+        resp = db.scan(TableName="alias-mail-aliases")
+        items = [
+            {
+                "alias_email": i["alias_email"]["S"],
+                "display_name": i.get("display_name", {}).get("S", ""),
+            }
+            for i in resp.get("Items", [])
+        ]
+        items.sort(key=lambda x: x["display_name"])
+        return items
+    except (BotoCoreError, ClientError) as e:
+        raise HTTPException(status_code=500, detail=str(e))

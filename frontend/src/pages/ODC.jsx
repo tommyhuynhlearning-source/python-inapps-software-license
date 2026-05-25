@@ -1,7 +1,34 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 
 const IT_SERVICE_PROJECT = 'IT Service'
+
+function useAliasMail(getToken) {
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const token = await getToken()
+        const res = await fetch('/api/aws/dynamodb/alias-mail-aliases/items', {
+          headers: { Authorization: `Bearer ${token}` },
+          signal: AbortSignal.timeout(15000),
+        })
+        if (!res.ok) throw new Error(res.statusText)
+        const json = await res.json()
+        if (!cancelled) setData(json)
+      } catch (e) {
+        if (!cancelled) setError(e.message)
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [])
+  return { data, loading, error }
+}
 
 export default function ODC() {
   const { getToken } = useAuth()
@@ -9,6 +36,8 @@ export default function ODC() {
   const [creating, setCreating] = useState(false)
   const [createdTasks, setCreatedTasks] = useState([])
   const [toast, setToast] = useState(null)
+  const [aliasSearch, setAliasSearch] = useState('')
+  const aliases = useAliasMail(getToken)
 
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type })
@@ -97,6 +126,78 @@ export default function ODC() {
         >
           {creating ? 'Đang tạo...' : '+ Tạo task'}
         </button>
+      </div>
+
+      {/* Alias Mail section */}
+      <div style={{ marginBottom: 32 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+          <div>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#111827' }}>Alias Mail</span>
+            {aliases.data && (
+              <span style={{
+                marginLeft: 8, background: '#ede9fe', color: '#6d28d9',
+                borderRadius: 10, padding: '1px 8px', fontSize: 12, fontWeight: 500,
+              }}>
+                {aliases.data.length}
+              </span>
+            )}
+          </div>
+          <input
+            value={aliasSearch}
+            onChange={e => setAliasSearch(e.target.value)}
+            placeholder="Tìm tên hoặc email..."
+            style={{
+              border: '1px solid #e5e7eb', borderRadius: 6,
+              padding: '5px 10px', fontSize: 13, outline: 'none',
+              width: 220, background: '#fff',
+            }}
+          />
+        </div>
+
+        {aliases.loading && (
+          <div style={{ color: '#9ca3af', fontSize: 13, padding: '12px 0' }}>Đang tải...</div>
+        )}
+        {aliases.error && (
+          <div style={{ color: '#ef4444', fontSize: 13 }}>{aliases.error}</div>
+        )}
+        {aliases.data && (() => {
+          const q = aliasSearch.toLowerCase()
+          const filtered = aliases.data.filter(a =>
+            a.display_name.toLowerCase().includes(q) || a.alias_email.toLowerCase().includes(q)
+          )
+          return (
+            <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, overflow: 'hidden' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
+                <thead>
+                  <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+                    <th style={{ textAlign: 'left', padding: '8px 16px', fontWeight: 600, color: '#374151', fontSize: 13 }}>#</th>
+                    <th style={{ textAlign: 'left', padding: '8px 16px', fontWeight: 600, color: '#374151', fontSize: 13 }}>Tên</th>
+                    <th style={{ textAlign: 'left', padding: '8px 16px', fontWeight: 600, color: '#374151', fontSize: 13 }}>Email alias</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.length === 0 ? (
+                    <tr>
+                      <td colSpan={3} style={{ padding: '16px', color: '#9ca3af', textAlign: 'center' }}>Không tìm thấy</td>
+                    </tr>
+                  ) : filtered.map((a, i) => (
+                    <tr
+                      key={a.alias_email}
+                      style={{
+                        borderBottom: i < filtered.length - 1 ? '1px solid #f3f4f6' : 'none',
+                        background: i % 2 === 0 ? '#fff' : '#fafafa',
+                      }}
+                    >
+                      <td style={{ padding: '9px 16px', color: '#9ca3af', fontSize: 13 }}>{i + 1}</td>
+                      <td style={{ padding: '9px 16px', fontWeight: 500, color: '#111827' }}>{a.display_name}</td>
+                      <td style={{ padding: '9px 16px', color: '#6b7280', fontFamily: 'monospace', fontSize: 13 }}>{a.alias_email}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
+        })()}
       </div>
 
       {/* Tasks created this session */}
