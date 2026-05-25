@@ -1,9 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../context/AuthContext'
 
 const IT_SERVICE_PROJECT = 'IT Service'
-
-const DEFAULT_NON_ODC = ['legal@inapps.net', 'vy.doan@inapps.net']
+const DEFAULT_CONFIG = { status: 'active', odc_type: 'odc' }
 
 function useAliasMail(getToken) {
   const [data, setData] = useState(null)
@@ -34,40 +33,71 @@ function useAliasMail(getToken) {
 
 export default function ODC() {
   const { getToken } = useAuth()
-  const [nonOdcEmails, setNonOdcEmails] = useState(() => {
-    try {
-      const saved = localStorage.getItem('nonOdcEmails')
-      return new Set(saved ? JSON.parse(saved) : DEFAULT_NON_ODC)
-    } catch { return new Set(DEFAULT_NON_ODC) }
-  })
-  const toggleOdc = (email) => {
-    setNonOdcEmails(prev => {
-      const next = new Set(prev)
-      if (next.has(email)) next.delete(email); else next.add(email)
-      localStorage.setItem('nonOdcEmails', JSON.stringify([...next]))
-      return next
-    })
-  }
-  const [inactiveEmails, setInactiveEmails] = useState(() => {
-    try {
-      const saved = localStorage.getItem('inactiveEmails')
-      return new Set(saved ? JSON.parse(saved) : [])
-    } catch { return new Set() }
-  })
-  const toggleStatus = (email) => {
-    setInactiveEmails(prev => {
-      const next = new Set(prev)
-      if (next.has(email)) next.delete(email); else next.add(email)
-      localStorage.setItem('inactiveEmails', JSON.stringify([...next]))
-      return next
-    })
-  }
+  const [aliasConfig, setAliasConfig] = useState({})
+  const syncedRef = useRef(false)
   const [taskName, setTaskName] = useState('')
   const [creating, setCreating] = useState(false)
   const [createdTasks, setCreatedTasks] = useState([])
   const [toast, setToast] = useState(null)
   const [aliasSearch, setAliasSearch] = useState('')
   const aliases = useAliasMail(getToken)
+
+  // Load Firestore config on mount
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const token = await getToken()
+        const res = await fetch('/api/alias-mail-config', {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (!res.ok) return
+        const data = await res.json()
+        if (!cancelled) setAliasConfig(data)
+      } catch { /* use defaults */ }
+    })()
+    return () => { cancelled = true }
+  }, [])
+
+  // Sync Firestore with DynamoDB list (runs once after list loads)
+  useEffect(() => {
+    if (!aliases.data || syncedRef.current) return
+    syncedRef.current = true
+    ;(async () => {
+      try {
+        const token = await getToken()
+        const emails = aliases.data.map(a => a.alias_email)
+        const syncRes = await fetch('/api/alias-mail-config/sync', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ emails }),
+        })
+        if (!syncRes.ok) return
+        // Re-fetch config after sync to pick up newly created entries
+        const configRes = await fetch('/api/alias-mail-config', {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (configRes.ok) setAliasConfig(await configRes.json())
+      } catch { /* non-critical */ }
+    })()
+  }, [aliases.data])
+
+  const updateConfig = async (email, patch) => {
+    const current = aliasConfig[email] || DEFAULT_CONFIG
+    const next = { ...current, ...patch }
+    setAliasConfig(prev => ({ ...prev, [email]: next }))
+    try {
+      const token = await getToken()
+      const res = await fetch(`/api/alias-mail-config/${encodeURIComponent(email)}`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(next),
+      })
+      if (!res.ok) throw new Error()
+    } catch {
+      setAliasConfig(prev => ({ ...prev, [email]: current }))
+    }
+  }
 
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type })
@@ -212,89 +242,60 @@ export default function ODC() {
                     <tr>
                       <td colSpan={5} style={{ padding: '16px', color: '#9ca3af', textAlign: 'center' }}>Không tìm thấy</td>
                     </tr>
-                  ) : filtered.map((a, i) => (
-                    <tr
-                      key={a.alias_email}
-                      style={{
-                        borderBottom: i < filtered.length - 1 ? '1px solid #f3f4f6' : 'none',
-                        background: i % 2 === 0 ? '#fff' : '#fafafa',
-                      }}
-                    >
-                      <td style={{ padding: '9px 16px', color: '#9ca3af', fontSize: 13 }}>{i + 1}</td>
-                      <td style={{ padding: '9px 16px', fontWeight: 500, color: '#111827' }}>{a.display_name}</td>
-                      <td style={{ padding: '9px 16px', color: '#6b7280', fontFamily: 'monospace', fontSize: 13 }}>{a.alias_email}</td>
-                      <td style={{ padding: '9px 16px' }}>
-                        {nonOdcEmails.has(a.alias_email) ? (
+                  ) : filtered.map((a, i) => {
+                    const cfg = aliasConfig[a.alias_email] || DEFAULT_CONFIG
+                    const isNonOdc = cfg.odc_type === 'non-odc'
+                    const isInactive = cfg.status === 'inactive'
+                    return (
+                      <tr
+                        key={a.alias_email}
+                        style={{
+                          borderBottom: i < filtered.length - 1 ? '1px solid #f3f4f6' : 'none',
+                          background: i % 2 === 0 ? '#fff' : '#fafafa',
+                        }}
+                      >
+                        <td style={{ padding: '9px 16px', color: '#9ca3af', fontSize: 13 }}>{i + 1}</td>
+                        <td style={{ padding: '9px 16px', fontWeight: 500, color: '#111827' }}>{a.display_name}</td>
+                        <td style={{ padding: '9px 16px', color: '#6b7280', fontFamily: 'monospace', fontSize: 13 }}>{a.alias_email}</td>
+                        <td style={{ padding: '9px 16px' }}>
                           <span
-                            onClick={() => toggleOdc(a.alias_email)}
-                            title="Click để đổi sang ODC"
+                            onClick={() => updateConfig(a.alias_email, { odc_type: isNonOdc ? 'odc' : 'non-odc' })}
+                            title={isNonOdc ? 'Click để đổi sang ODC' : 'Click để đổi sang Non ODC'}
                             style={{
                               display: 'inline-flex', alignItems: 'center', gap: 4,
-                              background: '#fef3c7', color: '#92400e',
-                              border: '1px solid #fde68a',
+                              background: isNonOdc ? '#fef3c7' : '#eff6ff',
+                              color: isNonOdc ? '#92400e' : '#1d4ed8',
+                              border: `1px solid ${isNonOdc ? '#fde68a' : '#bfdbfe'}`,
                               borderRadius: 99, padding: '2px 8px',
                               fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap',
                               cursor: 'pointer', userSelect: 'none',
                             }}
                           >
-                            <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#f59e0b', flexShrink: 0 }} />
-                            Non ODC
+                            <span style={{ width: 5, height: 5, borderRadius: '50%', background: isNonOdc ? '#f59e0b' : '#3b82f6', flexShrink: 0 }} />
+                            {isNonOdc ? 'Non ODC' : 'ODC'}
                           </span>
-                        ) : (
+                        </td>
+                        <td style={{ padding: '9px 16px' }}>
                           <span
-                            onClick={() => toggleOdc(a.alias_email)}
-                            title="Click để đổi sang Non ODC"
+                            onClick={() => updateConfig(a.alias_email, { status: isInactive ? 'active' : 'inactive' })}
+                            title={isInactive ? 'Click để đổi sang Active' : 'Click để đổi sang Inactive'}
                             style={{
                               display: 'inline-flex', alignItems: 'center', gap: 4,
-                              background: '#eff6ff', color: '#1d4ed8',
-                              border: '1px solid #bfdbfe',
+                              background: isInactive ? '#f3f4f6' : '#f0fdf4',
+                              color: isInactive ? '#6b7280' : '#15803d',
+                              border: `1px solid ${isInactive ? '#e5e7eb' : '#bbf7d0'}`,
                               borderRadius: 99, padding: '2px 8px',
                               fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap',
                               cursor: 'pointer', userSelect: 'none',
                             }}
                           >
-                            <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#3b82f6', flexShrink: 0 }} />
-                            ODC
+                            <span style={{ width: 5, height: 5, borderRadius: '50%', background: isInactive ? '#9ca3af' : '#22c55e', flexShrink: 0 }} />
+                            {isInactive ? 'Inactive' : 'Active'}
                           </span>
-                        )}
-                      </td>
-                      <td style={{ padding: '9px 16px' }}>
-                        {inactiveEmails.has(a.alias_email) ? (
-                          <span
-                            onClick={() => toggleStatus(a.alias_email)}
-                            title="Click để đổi sang Active"
-                            style={{
-                              display: 'inline-flex', alignItems: 'center', gap: 4,
-                              background: '#f3f4f6', color: '#6b7280',
-                              border: '1px solid #e5e7eb',
-                              borderRadius: 99, padding: '2px 8px',
-                              fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap',
-                              cursor: 'pointer', userSelect: 'none',
-                            }}
-                          >
-                            <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#9ca3af', flexShrink: 0 }} />
-                            Inactive
-                          </span>
-                        ) : (
-                          <span
-                            onClick={() => toggleStatus(a.alias_email)}
-                            title="Click để đổi sang Inactive"
-                            style={{
-                              display: 'inline-flex', alignItems: 'center', gap: 4,
-                              background: '#f0fdf4', color: '#15803d',
-                              border: '1px solid #bbf7d0',
-                              borderRadius: 99, padding: '2px 8px',
-                              fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap',
-                              cursor: 'pointer', userSelect: 'none',
-                            }}
-                          >
-                            <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#22c55e', flexShrink: 0 }} />
-                            Active
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
