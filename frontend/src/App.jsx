@@ -6,6 +6,7 @@ import License from './pages/License'
 import Device from './pages/Device'
 import Security from './pages/Security'
 import ODC from './pages/ODC'
+import AWS from './pages/AWS'
 import Login from './pages/Login'
 
 const S = {
@@ -79,6 +80,7 @@ function AppContent() {
         <Route path="/device" element={<Device />} />
         <Route path="/security" element={<Security />} />
         <Route path="/odc" element={<ODC />} />
+        <Route path="/aws" element={<AWS />} />
       </Routes>
     </div>
   )
@@ -110,6 +112,7 @@ export default function App() {
           { path: '/device', label: 'Devices' },
           { path: '/odc', label: 'ODC' },
           { path: '/security', label: 'Security' },
+          { path: '/aws', label: 'AWS' },
         ].map(({ path, label }) => (
           <NavLink
             key={path}

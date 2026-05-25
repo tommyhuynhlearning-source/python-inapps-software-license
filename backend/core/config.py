@@ -17,6 +17,10 @@ class Settings(BaseSettings):
     smtp_password: str = ""
     smtp_to: str = "anh.huynh@inapps.net"
 
+    aws_access_key_id: str = ""
+    aws_secret_access_key: str = ""
+    aws_region: str = "ap-southeast-1"
+
     class Config:
         env_file = str(_ENV_FILE)
 

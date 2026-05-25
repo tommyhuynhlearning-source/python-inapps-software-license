@@ -4,7 +4,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from core.config import settings
-from routers import license, device, security, odoo
+from routers import license, device, security, odoo, aws
 
 app = FastAPI(title="InApps Software License API")
 
@@ -27,6 +27,7 @@ app.include_router(license.router)
 app.include_router(device.router)
 app.include_router(security.router)
 app.include_router(odoo.router)
+app.include_router(aws.router)
 
 
 @app.get("/api/health")
