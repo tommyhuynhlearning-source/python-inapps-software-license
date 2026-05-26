@@ -179,7 +179,7 @@ export default function ODC() {
           value={taskName}
           onChange={e => setTaskName(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Tên task mới..."
+          placeholder="Nhập tên nhân sự ODC mới..."
           style={{
             flex: 1, border: '1px solid #e5e7eb', borderRadius: 6,
             padding: '7px 12px', fontSize: 14, outline: 'none',
@@ -197,7 +197,7 @@ export default function ODC() {
             whiteSpace: 'nowrap',
           }}
         >
-          {creating ? 'Đang tạo...' : '+ Tạo task'}
+          {creating ? 'Đang tạo...' : '+ Tạo mail mới'}
         </button>
       </div>
 
