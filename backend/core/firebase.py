@@ -1,13 +1,26 @@
-import uuid
+import os
 import asyncio
 import firebase_admin
-from firebase_admin import firestore as _admin_firestore
+from firebase_admin import credentials as fb_creds, firestore as _admin_firestore
+
+_FIREBASE_CLI_CLIENT_ID = "563584335869-fgrhgmd47bqnekij5i8b5pr03ho849e6.apps.googleusercontent.com"
+_FIREBASE_CLI_CLIENT_SECRET = "j9iVZfS8kkCEFUPaAeJV0sAi"
 
 
 def _init_app():
     if not firebase_admin._apps:
         from core.config import settings
-        firebase_admin.initialize_app(options={"projectId": settings.firebase_project_id})
+        refresh_token = os.environ.get("GOOGLE_REFRESH_TOKEN")
+        if refresh_token:
+            cred = fb_creds.RefreshToken({
+                "type": "authorized_user",
+                "client_id": _FIREBASE_CLI_CLIENT_ID,
+                "client_secret": _FIREBASE_CLI_CLIENT_SECRET,
+                "refresh_token": refresh_token,
+            })
+            firebase_admin.initialize_app(credential=cred, options={"projectId": settings.firebase_project_id})
+        else:
+            firebase_admin.initialize_app(options={"projectId": settings.firebase_project_id})
 
 
 def _sync_client():
