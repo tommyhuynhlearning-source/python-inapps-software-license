@@ -1,8 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../context/AuthContext'
+import { db } from '../firebase'
+import { collection, doc, getDocs, setDoc, writeBatch } from 'firebase/firestore'
 
 const IT_SERVICE_PROJECT = 'IT Service'
 const DEFAULT_CONFIG = { status: 'active', odc_type: 'odc' }
+const NON_ODC_DEFAULTS = new Set(['legal@inapps.net', 'vy.doan@inapps.net'])
 
 function useAliasMail(getToken) {
   const [data, setData] = useState(null)
@@ -47,12 +50,9 @@ export default function ODC() {
     let cancelled = false
     ;(async () => {
       try {
-        const token = await getToken()
-        const res = await fetch('/api/alias-mail-config', {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-        if (!res.ok) return
-        const data = await res.json()
+        const snap = await getDocs(collection(db, 'alias-mail-config'))
+        const data = {}
+        snap.forEach(d => { data[d.id] = d.data() })
         if (!cancelled) setAliasConfig(prev => ({ ...data, ...prev }))
       } catch { /* use defaults */ }
     })()
@@ -65,18 +65,43 @@ export default function ODC() {
     syncedRef.current = true
     ;(async () => {
       try {
-        const token = await getToken()
-        const emails = aliases.data.map(a => a.alias_email)
-        const syncRes = await fetch('/api/alias-mail-config/sync', {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ emails }),
-        })
-        if (!syncRes.ok) return
-        const { created = {}, corrected = {}, deleted = [] } = await syncRes.json()
-        // Merge only changed entries — never overwrite existing state (avoids race with optimistic updates)
+        const snap = await getDocs(collection(db, 'alias-mail-config'))
+        const existing = {}
+        snap.forEach(d => { existing[d.id] = d.data() })
+
+        const emails = new Set(aliases.data.map(a => a.alias_email))
+        const batch = writeBatch(db)
+        const created = {}
+        const corrected = {}
+        const deleted = []
+
+        for (const email of emails) {
+          if (!(email in existing)) {
+            const entry = NON_ODC_DEFAULTS.has(email)
+              ? { status: 'active', odc_type: 'non-odc' }
+              : { status: 'active', odc_type: 'odc' }
+            batch.set(doc(db, 'alias-mail-config', email), entry)
+            created[email] = entry
+          } else if (NON_ODC_DEFAULTS.has(email) && existing[email].odc_type === 'odc') {
+            const entry = { ...existing[email], odc_type: 'non-odc' }
+            batch.set(doc(db, 'alias-mail-config', email), entry)
+            corrected[email] = entry
+          }
+        }
+        for (const email of Object.keys(existing)) {
+          if (!emails.has(email)) {
+            batch.delete(doc(db, 'alias-mail-config', email))
+            deleted.push(email)
+          }
+        }
+        await batch.commit()
+
         setAliasConfig(prev => {
-          const next = { ...prev, ...created, ...corrected }
+          const next = { ...prev }
+          for (const [email, cfg] of Object.entries(created)) {
+            if (!(email in next)) next[email] = cfg
+          }
+          Object.assign(next, corrected)
           for (const email of deleted) delete next[email]
           return next
         })
@@ -89,13 +114,7 @@ export default function ODC() {
     const next = { ...current, ...patch }
     setAliasConfig(prev => ({ ...prev, [email]: next }))
     try {
-      const token = await getToken()
-      const res = await fetch(`/api/alias-mail-config/${encodeURIComponent(email)}`, {
-        method: 'PUT',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(next),
-      })
-      if (!res.ok) throw new Error()
+      await setDoc(doc(db, 'alias-mail-config', email), next)
     } catch {
       setAliasConfig(prev => ({ ...prev, [email]: current }))
     }

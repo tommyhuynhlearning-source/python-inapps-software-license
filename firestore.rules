@@ -1,0 +1,41 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /software_licenses/{docId} {
+      allow write: if request.auth != null
+                   && request.auth.token.email.matches('.*@inapps\\.net$');
+      allow read: if request.auth != null
+                  && exists(/databases/$(database)/documents/admins/$(request.auth.token.email));
+    }
+
+    match /admins/{email} {
+      allow read: if request.auth != null
+                  && request.auth.token.email.matches('.*@inapps\\.net$');
+      allow write: if request.auth != null
+                   && request.auth.token.email.matches('.*@inapps\\.net$');
+    }
+
+    match /aws_billing_cache/{document=**} {
+      allow read: if request.auth != null
+                  && request.auth.token.email.matches('.*@inapps\\.net$');
+      allow write: if request.auth != null;
+    }
+
+    match /devices/{doc} {
+      allow read, write: if request.auth != null
+                         && exists(/databases/$(database)/documents/admins/$(request.auth.token.email));
+    }
+
+    match /security_records/{doc} {
+      allow read, write: if request.auth != null
+                         && exists(/databases/$(database)/documents/admins/$(request.auth.token.email));
+    }
+
+    match /alias-mail-config/{document} {
+      allow read, write: if request.auth != null
+                         && request.auth.token.email.matches('.*@inapps\\.net$');
+    }
+
+  }
+}

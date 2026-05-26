@@ -1,166 +1,87 @@
 import uuid
-import httpx
-
-FIRESTORE_BASE = "https://firestore.googleapis.com/v1"
-
-_client = httpx.AsyncClient(timeout=30)
+import asyncio
+import firebase_admin
+from firebase_admin import firestore as _admin_firestore
 
 
-def _auth_header(token: str) -> dict:
-    return {"Authorization": f"Bearer {token}"}
+def _init_app():
+    if not firebase_admin._apps:
+        from core.config import settings
+        firebase_admin.initialize_app(options={"projectId": settings.firebase_project_id})
 
 
-# ---------- value encoding / decoding ----------
+def _sync_client():
+    _init_app()
+    return _admin_firestore.client()
 
-def _decode(v: dict):
-    if "stringValue" in v:    return v["stringValue"]
-    if "booleanValue" in v:   return v["booleanValue"]
-    if "integerValue" in v:   return int(v["integerValue"])
-    if "doubleValue" in v:    return float(v["doubleValue"])
-    if "nullValue" in v:      return None
-    if "timestampValue" in v: return v["timestampValue"]
-    if "mapValue" in v:       return _decode_fields(v["mapValue"].get("fields", {}))
-    if "arrayValue" in v:     return [_decode(x) for x in v["arrayValue"].get("values", [])]
-    return v
-
-
-def _decode_fields(fields: dict) -> dict:
-    return {k: _decode(v) for k, v in fields.items()}
-
-
-def _encode(val) -> dict:
-    if isinstance(val, bool):  return {"booleanValue": val}
-    if isinstance(val, int):   return {"integerValue": str(val)}
-    if isinstance(val, float): return {"doubleValue": val}
-    if isinstance(val, str):   return {"stringValue": val}
-    if val is None:            return {"nullValue": None}
-    if isinstance(val, dict):
-        return {"mapValue": {"fields": {k: _encode(v) for k, v in val.items()}}}
-    if isinstance(val, list):
-        return {"arrayValue": {"values": [_encode(x) for x in val]}}
-    return {"stringValue": str(val)}
-
-
-def _encode_fields(data: dict) -> dict:
-    return {"fields": {k: _encode(v) for k, v in data.items()}}
-
-
-# ---------- Firestore REST wrapper ----------
 
 class _Doc:
-    def __init__(self, raw: dict):
-        name = raw.get("name", "")
-        self.id = name.rsplit("/", 1)[-1]
-        self._fields = raw.get("fields", {})
-        self.exists = True
+    def __init__(self, snap):
+        self.id = snap.id
+        self.exists = snap.exists
+        self._snap = snap
 
     def to_dict(self) -> dict:
-        return _decode_fields(self._fields)
+        return self._snap.to_dict() or {}
 
 
 class _DocRef:
-    def __init__(self, url: str, doc_id: str, token: str):
-        self._url = url
-        self.id = doc_id
-        self._token = token
-        self._raw = None
+    def __init__(self, ref):
+        self._ref = ref
+        self.id = ref.id
         self.exists = False
+        self._snap = None
 
     async def get(self) -> "_DocRef":
-        r = await _client.get(self._url, headers=_auth_header(self._token))
-        if r.status_code == 404:
-            self.exists = False
-        else:
-            r.raise_for_status()
-            self._raw = r.json()
-            self.exists = True
+        snap = await asyncio.to_thread(self._ref.get)
+        self.exists = snap.exists
+        self._snap = snap
         return self
 
     def to_dict(self) -> dict:
-        return _decode_fields(self._raw.get("fields", {})) if self._raw else {}
+        return self._snap.to_dict() if self._snap and self._snap.exists else {}
 
     async def set(self, data: dict):
-        r = await _client.patch(
-            self._url, headers=_auth_header(self._token),
-            json=_encode_fields(data),
-        )
-        r.raise_for_status()
+        await asyncio.to_thread(self._ref.set, data)
 
     async def update(self, data: dict):
-        params = [("updateMask.fieldPaths", k) for k in data]
-        r = await _client.patch(
-            self._url, headers=_auth_header(self._token),
-            json=_encode_fields(data), params=params,
-        )
-        r.raise_for_status()
+        await asyncio.to_thread(self._ref.update, data)
 
     async def delete(self):
-        r = await _client.delete(self._url, headers=_auth_header(self._token))
-        r.raise_for_status()
+        await asyncio.to_thread(self._ref.delete)
 
 
 class _OrderedCollection:
-    def __init__(self, coll: "_Collection", field: str, direction: str):
-        self._coll = coll
-        self._field = field
-        self._direction = direction
+    def __init__(self, query):
+        self._query = query
 
     async def stream(self, limit: int = 500):
-        db = self._coll._db
-        url = f"{db._base}:runQuery"
-        query = {
-            "structuredQuery": {
-                "from": [{"collectionId": self._coll._name}],
-                "orderBy": [
-                    {"field": {"fieldPath": self._field}, "direction": self._direction}
-                ],
-                "limit": limit,
-            }
-        }
-        r = await _client.post(url, headers=_auth_header(db._token), json=query)
-        r.raise_for_status()
-        return [_Doc(item["document"]) for item in r.json() if "document" in item]
+        docs = await asyncio.to_thread(lambda: list(self._query.limit(limit).stream()))
+        return [_Doc(d) for d in docs]
 
 
 class _Collection:
-    def __init__(self, db: "FirestoreDB", name: str):
-        self._db = db
-        self._name = name
-
-    def _doc_url(self, doc_id: str) -> str:
-        return f"{self._db._base}/{self._name}/{doc_id}"
+    def __init__(self, coll_ref):
+        self._ref = coll_ref
 
     async def stream(self, limit: int = 500):
-        r = await _client.get(
-            f"{self._db._base}/{self._name}",
-            headers=_auth_header(self._db._token),
-            params={"pageSize": limit},
-        )
-        if not r.is_success:
-            raise RuntimeError(f"Firestore {r.status_code}: {r.text}")
-        return [_Doc(d) for d in r.json().get("documents", [])]
+        docs = await asyncio.to_thread(lambda: list(self._ref.limit(limit).stream()))
+        return [_Doc(d) for d in docs]
 
     def document(self, doc_id: str = None) -> _DocRef:
-        if doc_id is None:
-            doc_id = uuid.uuid4().hex
-        return _DocRef(self._doc_url(doc_id), doc_id, self._db._token)
+        ref = self._ref.document(doc_id) if doc_id else self._ref.document()
+        return _DocRef(ref)
 
     def order_by(self, field: str, direction: str = "ASCENDING") -> _OrderedCollection:
-        return _OrderedCollection(self, field, direction)
+        from google.cloud.firestore_v1 import Query
+        dir_const = Query.DESCENDING if direction == "DESCENDING" else Query.ASCENDING
+        return _OrderedCollection(self._ref.order_by(field, direction=dir_const))
 
 
 class FirestoreDB:
-    def __init__(self, project_id: str, token: str):
-        self._project = project_id
-        self._token = token
-        self._base = (
-            f"{FIRESTORE_BASE}/projects/{project_id}/databases/(default)/documents"
-        )
-
     def collection(self, name: str) -> _Collection:
-        return _Collection(self, name)
+        return _Collection(_sync_client().collection(name))
 
 
-def get_db(token: str) -> FirestoreDB:
-    from core.config import settings
-    return FirestoreDB(settings.firebase_project_id, token)
+def get_db(token: str = None) -> FirestoreDB:
+    return FirestoreDB()
