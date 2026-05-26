@@ -2,9 +2,26 @@ import os
 import asyncio
 import firebase_admin
 from firebase_admin import credentials as fb_creds, firestore as _admin_firestore
+from google.oauth2.credentials import Credentials as OAuthCredentials
 
 _FIREBASE_CLI_CLIENT_ID = "563584335869-fgrhgmd47bqnekij5i8b5pr03ho849e6.apps.googleusercontent.com"
 _FIREBASE_CLI_CLIENT_SECRET = "j9iVZfS8kkCEFUPaAeJV0sAi"
+
+
+class _CloudPlatformCredential(fb_creds.Base):
+    """Uses Firebase CLI refresh token with cloud-platform scope (supported by the CLI OAuth client)."""
+    def __init__(self, refresh_token: str):
+        self._g_credential = OAuthCredentials(
+            token=None,
+            refresh_token=refresh_token,
+            token_uri="https://oauth2.googleapis.com/token",
+            client_id=_FIREBASE_CLI_CLIENT_ID,
+            client_secret=_FIREBASE_CLI_CLIENT_SECRET,
+            scopes=["https://www.googleapis.com/auth/cloud-platform"],
+        )
+
+    def get_credential(self):
+        return self._g_credential
 
 
 def _init_app():
@@ -12,13 +29,10 @@ def _init_app():
         from core.config import settings
         refresh_token = os.environ.get("GOOGLE_REFRESH_TOKEN")
         if refresh_token:
-            cred = fb_creds.RefreshToken({
-                "type": "authorized_user",
-                "client_id": _FIREBASE_CLI_CLIENT_ID,
-                "client_secret": _FIREBASE_CLI_CLIENT_SECRET,
-                "refresh_token": refresh_token,
-            })
-            firebase_admin.initialize_app(credential=cred, options={"projectId": settings.firebase_project_id})
+            firebase_admin.initialize_app(
+                credential=_CloudPlatformCredential(refresh_token),
+                options={"projectId": settings.firebase_project_id},
+            )
         else:
             firebase_admin.initialize_app(options={"projectId": settings.firebase_project_id})
 
