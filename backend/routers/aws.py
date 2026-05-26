@@ -226,9 +226,9 @@ async def billing_summary(refresh: bool = False, token: str = Depends(get_token)
         services = []
         for r in resp_svc.get("ResultsByTime", []):
             for group in r.get("Groups", []):
-                amount = float(group["Metrics"]["UnblendedCost"]["Amount"])
+                amount = round(float(group["Metrics"]["UnblendedCost"]["Amount"]), 2)
                 if amount > 0:
-                    services.append({"name": group["Keys"][0], "amount": round(amount, 2)})
+                    services.append({"name": group["Keys"][0], "amount": amount})
         services.sort(key=lambda x: x["amount"], reverse=True)
 
         result = {
