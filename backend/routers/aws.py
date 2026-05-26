@@ -168,6 +168,68 @@ async def list_instances(token: str = Depends(get_token)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/billing/summary")
+async def billing_summary(refresh: bool = False, token: str = Depends(get_token)):
+    from datetime import datetime, timezone, timedelta
+    from core.firebase import get_db
+
+    db = get_db()
+    cache_doc = db.collection("aws_billing_cache").document("summary")
+
+    if not refresh:
+        doc = await cache_doc.get()
+        if doc.exists:
+            data = doc.to_dict()
+            cached_at = data.get("cached_at")
+            if cached_at and (datetime.now(timezone.utc) - cached_at).total_seconds() < 6 * 3600:
+                return data
+
+    try:
+        from datetime import datetime, timezone, timedelta
+        ce = boto3.client(
+            "ce",
+            region_name="us-east-1",
+            aws_access_key_id=settings.aws_access_key_id or None,
+            aws_secret_access_key=settings.aws_secret_access_key or None,
+        )
+        now = datetime.now(timezone.utc)
+        this_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        prev_start = (this_start - timedelta(days=1)).replace(day=1)
+
+        def fmt(d): return d.strftime("%Y-%m-%d")
+
+        resp = ce.get_cost_and_usage(
+            TimePeriod={"Start": fmt(prev_start), "End": fmt(now + timedelta(days=1))},
+            Granularity="MONTHLY",
+            Metrics=["UnblendedCost"],
+        )
+
+        monthly = {}
+        for r in resp.get("ResultsByTime", []):
+            key = r["TimePeriod"]["Start"][:7]
+            monthly[key] = float(r["Total"]["UnblendedCost"]["Amount"])
+
+        this_key = now.strftime("%Y-%m")
+        prev_key = (now.replace(day=1) - timedelta(days=1)).strftime("%Y-%m")
+        this_amount = monthly.get(this_key, 0.0)
+        prev_amount = monthly.get(prev_key, 0.0)
+        change_pct = round((this_amount - prev_amount) / prev_amount * 100, 1) if prev_amount else 0.0
+
+        result = {
+            "this_month": {"label": now.strftime("%b %Y"), "amount": round(this_amount, 2)},
+            "prev_month": {
+                "label": (now.replace(day=1) - timedelta(days=1)).strftime("%b %Y"),
+                "amount": round(prev_amount, 2),
+            },
+            "change_pct": change_pct,
+            "cached_at": datetime.now(timezone.utc),
+        }
+        await cache_doc.set(result)
+        return result
+    except (BotoCoreError, ClientError) as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/dynamodb/alias-mail-aliases/items")
 async def list_alias_mail(token: str = Depends(get_token)):
     try:

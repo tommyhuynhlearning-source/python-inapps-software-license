@@ -325,6 +325,78 @@ function CloudFrontRow({ dist }) {
   )
 }
 
+function BillingCard({ getToken }) {
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [refreshing, setRefreshing] = useState(false)
+
+  const load = async (force = false) => {
+    force ? setRefreshing(true) : setLoading(true)
+    setError(null)
+    try {
+      const token = await getToken()
+      const url = force ? '/api/aws/billing/summary?refresh=true' : '/api/aws/billing/summary'
+      const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+      const json = r.ok ? await r.json() : await r.json().then(j => Promise.reject(j.detail || r.statusText))
+      setData(json)
+    } catch (e) {
+      setError(String(e))
+    } finally {
+      setLoading(false)
+      setRefreshing(false)
+    }
+  }
+
+  useEffect(() => { load() }, [])
+
+  const up = data?.change_pct >= 0
+
+  return (
+    <div style={{
+      background: '#111827', borderRadius: 12, padding: '20px 24px',
+      marginBottom: 24, display: 'flex', alignItems: 'center', gap: 32,
+    }}>
+      {loading && <span style={{ fontSize: 13, color: '#6b7280' }}>Đang tải billing...</span>}
+      {error && <span style={{ fontSize: 13, color: '#f87171' }}>{error}</span>}
+      {data && (
+        <>
+          <div>
+            <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 500, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Tháng này</div>
+            <div style={{ fontSize: 28, fontWeight: 800, color: '#f9fafb', letterSpacing: '-0.5px' }}>
+              ${data.this_month.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              <span style={{ fontSize: 13, fontWeight: 500, color: '#4b5563', marginLeft: 6 }}>{data.this_month.label}</span>
+            </div>
+            <div style={{ marginTop: 4, fontSize: 12, fontWeight: 600, color: up ? '#f87171' : '#4ade80' }}>
+              {up ? '▲' : '▼'} {Math.abs(data.change_pct)}% so với tháng trước
+            </div>
+          </div>
+          <div style={{ width: 1, height: 48, background: '#1f2937', flexShrink: 0 }} />
+          <div>
+            <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 500, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Tháng trước</div>
+            <div style={{ fontSize: 28, fontWeight: 800, color: '#f9fafb', letterSpacing: '-0.5px' }}>
+              ${data.prev_month.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              <span style={{ fontSize: 13, fontWeight: 500, color: '#4b5563', marginLeft: 6 }}>{data.prev_month.label}</span>
+            </div>
+          </div>
+          <div style={{ marginLeft: 'auto' }}>
+            <button
+              onClick={() => load(true)}
+              disabled={refreshing}
+              style={{
+                background: '#1f2937', border: 'none', color: refreshing ? '#374151' : '#6b7280',
+                borderRadius: 6, padding: '6px 12px', fontSize: 12, cursor: refreshing ? 'default' : 'pointer',
+              }}
+            >
+              {refreshing ? '...' : '↻ Refresh'}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 function Section({ title, children }) {
   const [open, setOpen] = useState(false)
   return (
@@ -365,6 +437,8 @@ export default function AWS() {
           Tổng quan tài nguyên AWS — Region: <strong>ap-southeast-1</strong>
         </p>
       </div>
+
+      <BillingCard getToken={getToken} />
 
       {/* DynamoDB */}
       <Section title={`DynamoDB Tables${dynamo.data ? ` (${dynamo.data.length})` : ''}`}>
