@@ -446,19 +446,36 @@ function BillingCard({ getToken }) {
   )
 }
 
-function Section({ title, children }) {
+function Section({ title, emoji, color = '#6b7280', count, children }) {
   const [open, setOpen] = useState(false)
   return (
-    <div style={{ marginBottom: 12, border: '1px solid #e5e7eb', borderRadius: 8, overflow: 'hidden' }}>
+    <div style={{
+      marginBottom: 10,
+      border: '1px solid #e5e7eb',
+      borderLeft: `3px solid ${color}`,
+      borderRadius: 10,
+      overflow: 'hidden',
+      background: '#fff',
+    }}>
       <button
         onClick={() => setOpen(o => !o)}
         style={{
-          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '12px 16px', background: open ? '#f9fafb' : '#fff', border: 'none', cursor: 'pointer', textAlign: 'left',
+          width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+          padding: '13px 16px', background: open ? '#fafafa' : '#fff',
+          border: 'none', cursor: 'pointer', textAlign: 'left',
         }}
       >
-        <span style={{ fontSize: 13, fontWeight: 600, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{title}</span>
-        <span style={{ fontSize: 12, color: '#9ca3af', transition: 'transform 0.15s', display: 'inline-block', transform: open ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
+        {emoji && <span style={{ fontSize: 18, lineHeight: 1, flexShrink: 0 }}>{emoji}</span>}
+        <span style={{ fontSize: 14, fontWeight: 600, color: '#111827', flex: 1 }}>{title}</span>
+        {count != null && (
+          <span style={{
+            background: color + '18',
+            color: color,
+            borderRadius: 99, padding: '2px 9px',
+            fontSize: 12, fontWeight: 700, flexShrink: 0,
+          }}>{count}</span>
+        )}
+        <Chevron open={open} />
       </button>
       {open && (
         <div style={{ padding: '12px 16px', borderTop: '1px solid #f3f4f6', background: '#fff' }}>
@@ -483,7 +500,7 @@ export default function AWS() {
       <BillingCard getToken={getToken} />
 
       {/* DynamoDB */}
-      <Section title={`DynamoDB Tables${dynamo.data ? ` (${dynamo.data.length})` : ''}`}>
+      <Section title="DynamoDB Tables" emoji="🗄️" color="#6366f1" count={dynamo.data?.length}>
         {dynamo.loading && <span style={{ fontSize: 14, color: '#9ca3af' }}>Đang tải...</span>}
         {dynamo.error && <span style={{ fontSize: 14, color: '#dc2626' }}>{dynamo.error}</span>}
         {dynamo.data && dynamo.data.length === 0 && <span style={{ fontSize: 14, color: '#9ca3af' }}>Không có table nào.</span>}
@@ -495,7 +512,7 @@ export default function AWS() {
       </Section>
 
       {/* API Gateway */}
-      <Section title={`API Gateway${apis.data ? ` (${apis.data.length})` : ''}`}>
+      <Section title="API Gateway" emoji="🔌" color="#0891b2" count={apis.data?.length}>
         {apis.loading && <span style={{ fontSize: 14, color: '#9ca3af' }}>Đang tải...</span>}
         {apis.error && <span style={{ fontSize: 14, color: '#dc2626' }}>{apis.error}</span>}
         {apis.data && apis.data.length === 0 && <span style={{ fontSize: 14, color: '#9ca3af' }}>Không có API nào.</span>}
@@ -507,7 +524,7 @@ export default function AWS() {
       </Section>
 
       {/* CloudFront */}
-      <Section title={`CloudFront${distributions.data ? ` (${distributions.data.length})` : ''}`}>
+      <Section title="CloudFront" emoji="🌐" color="#f59e0b" count={distributions.data?.length}>
         {distributions.loading && <span style={{ fontSize: 14, color: '#9ca3af' }}>Đang tải...</span>}
         {distributions.error && <span style={{ fontSize: 14, color: '#dc2626' }}>{distributions.error}</span>}
         {distributions.data && distributions.data.length === 0 && <span style={{ fontSize: 14, color: '#9ca3af' }}>Không có distribution nào.</span>}
@@ -519,7 +536,7 @@ export default function AWS() {
       </Section>
 
       {/* S3 */}
-      <Section title={`S3 Buckets${buckets.data ? ` (${buckets.data.length})` : ''}`}>
+      <Section title="S3 Buckets" emoji="🪣" color="#10b981" count={buckets.data?.length}>
         {buckets.loading && <span style={{ fontSize: 14, color: '#9ca3af' }}>Đang tải...</span>}
         {buckets.error && <span style={{ fontSize: 14, color: '#dc2626' }}>{buckets.error}</span>}
         {buckets.data && buckets.data.length === 0 && <span style={{ fontSize: 14, color: '#9ca3af' }}>Không có bucket nào.</span>}
@@ -531,7 +548,7 @@ export default function AWS() {
       </Section>
 
       {/* Lambda */}
-      <Section title={`Lambda Functions${functions.data ? ` (${functions.data.length})` : ''}`}>
+      <Section title="Lambda Functions" emoji="⚡" color="#7c3aed" count={functions.data?.length}>
         {functions.loading && <span style={{ fontSize: 14, color: '#9ca3af' }}>Đang tải...</span>}
         {functions.error && <span style={{ fontSize: 14, color: '#dc2626' }}>{functions.error}</span>}
         {functions.data && functions.data.length === 0 && <span style={{ fontSize: 14, color: '#9ca3af' }}>Không có function nào.</span>}
@@ -543,7 +560,7 @@ export default function AWS() {
       </Section>
 
       {/* EC2 */}
-      <Section title={`EC2 Instances${instances.data ? ` (${instances.data.length})` : ''}`}>
+      <Section title="EC2 Instances" emoji="🖥️" color="#ef4444" count={instances.data?.length}>
         {instances.loading && <span style={{ fontSize: 14, color: '#9ca3af' }}>Đang tải...</span>}
         {instances.error && <span style={{ fontSize: 14, color: '#dc2626' }}>{instances.error}</span>}
         {instances.data && instances.data.length === 0 && <span style={{ fontSize: 14, color: '#9ca3af' }}>Không có instance nào.</span>}
