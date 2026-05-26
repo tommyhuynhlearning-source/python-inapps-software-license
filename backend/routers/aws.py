@@ -198,8 +198,10 @@ async def billing_summary(refresh: bool = False, token: str = Depends(get_token)
 
         def fmt(d): return d.strftime("%Y-%m-%d")
 
+        end_date = fmt(now + timedelta(days=1))
+
         resp = ce.get_cost_and_usage(
-            TimePeriod={"Start": fmt(prev_start), "End": fmt(now + timedelta(days=1))},
+            TimePeriod={"Start": fmt(prev_start), "End": end_date},
             Granularity="MONTHLY",
             Metrics=["UnblendedCost"],
         )
@@ -215,6 +217,20 @@ async def billing_summary(refresh: bool = False, token: str = Depends(get_token)
         prev_amount = monthly.get(prev_key, 0.0)
         change_pct = round((this_amount - prev_amount) / prev_amount * 100, 1) if prev_amount else 0.0
 
+        resp_svc = ce.get_cost_and_usage(
+            TimePeriod={"Start": fmt(this_start), "End": end_date},
+            Granularity="MONTHLY",
+            Metrics=["UnblendedCost"],
+            GroupBy=[{"Type": "DIMENSION", "Key": "SERVICE"}],
+        )
+        services = []
+        for r in resp_svc.get("ResultsByTime", []):
+            for group in r.get("Groups", []):
+                amount = float(group["Metrics"]["UnblendedCost"]["Amount"])
+                if amount > 0:
+                    services.append({"name": group["Keys"][0], "amount": round(amount, 2)})
+        services.sort(key=lambda x: x["amount"], reverse=True)
+
         result = {
             "this_month": {"label": now.strftime("%b %Y"), "amount": round(this_amount, 2)},
             "prev_month": {
@@ -222,6 +238,7 @@ async def billing_summary(refresh: bool = False, token: str = Depends(get_token)
                 "amount": round(prev_amount, 2),
             },
             "change_pct": change_pct,
+            "services": services,
             "cached_at": datetime.now(timezone.utc),
         }
         await cache_doc.set(result)

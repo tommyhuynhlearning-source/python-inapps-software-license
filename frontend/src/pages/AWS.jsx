@@ -353,45 +353,85 @@ function BillingCard({ getToken }) {
   const up = data?.change_pct >= 0
 
   return (
-    <div style={{
-      background: '#111827', borderRadius: 12, padding: '20px 24px',
-      marginBottom: 24, display: 'flex', alignItems: 'center', gap: 32,
-    }}>
-      {loading && <span style={{ fontSize: 13, color: '#6b7280' }}>Đang tải billing...</span>}
-      {error && <span style={{ fontSize: 13, color: '#f87171' }}>{error}</span>}
-      {data && (
-        <>
-          <div>
-            <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 500, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Tháng này</div>
-            <div style={{ fontSize: 28, fontWeight: 800, color: '#f9fafb', letterSpacing: '-0.5px' }}>
-              ${data.this_month.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              <span style={{ fontSize: 13, fontWeight: 500, color: '#4b5563', marginLeft: 6 }}>{data.this_month.label}</span>
+    <div style={{ marginBottom: 24 }}>
+      {/* Dark summary card */}
+      <div style={{
+        background: '#111827', borderRadius: data?.services?.length ? '12px 12px 0 0' : 12,
+        padding: '20px 24px', display: 'flex', alignItems: 'center', gap: 32,
+      }}>
+        {loading && <span style={{ fontSize: 13, color: '#6b7280' }}>Đang tải billing...</span>}
+        {error && <span style={{ fontSize: 13, color: '#f87171' }}>{error}</span>}
+        {data && (
+          <>
+            <div>
+              <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 500, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Tháng này</div>
+              <div style={{ fontSize: 28, fontWeight: 800, color: '#f9fafb', letterSpacing: '-0.5px' }}>
+                ${data.this_month.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                <span style={{ fontSize: 13, fontWeight: 500, color: '#4b5563', marginLeft: 6 }}>{data.this_month.label}</span>
+              </div>
+              <div style={{ marginTop: 4, fontSize: 12, fontWeight: 600, color: up ? '#f87171' : '#4ade80' }}>
+                {up ? '▲' : '▼'} {Math.abs(data.change_pct)}% so với tháng trước
+              </div>
             </div>
-            <div style={{ marginTop: 4, fontSize: 12, fontWeight: 600, color: up ? '#f87171' : '#4ade80' }}>
-              {up ? '▲' : '▼'} {Math.abs(data.change_pct)}% so với tháng trước
+            <div style={{ width: 1, height: 48, background: '#1f2937', flexShrink: 0 }} />
+            <div>
+              <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 500, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Tháng trước</div>
+              <div style={{ fontSize: 28, fontWeight: 800, color: '#f9fafb', letterSpacing: '-0.5px' }}>
+                ${data.prev_month.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                <span style={{ fontSize: 13, fontWeight: 500, color: '#4b5563', marginLeft: 6 }}>{data.prev_month.label}</span>
+              </div>
             </div>
-          </div>
-          <div style={{ width: 1, height: 48, background: '#1f2937', flexShrink: 0 }} />
-          <div>
-            <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 500, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Tháng trước</div>
-            <div style={{ fontSize: 28, fontWeight: 800, color: '#f9fafb', letterSpacing: '-0.5px' }}>
-              ${data.prev_month.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              <span style={{ fontSize: 13, fontWeight: 500, color: '#4b5563', marginLeft: 6 }}>{data.prev_month.label}</span>
+            <div style={{ marginLeft: 'auto' }}>
+              <button
+                onClick={() => load(true)}
+                disabled={refreshing}
+                style={{
+                  background: '#1f2937', border: 'none', color: refreshing ? '#374151' : '#6b7280',
+                  borderRadius: 6, padding: '6px 12px', fontSize: 12, cursor: refreshing ? 'default' : 'pointer',
+                }}
+              >
+                {refreshing ? '...' : '↻ Refresh'}
+              </button>
             </div>
-          </div>
-          <div style={{ marginLeft: 'auto' }}>
-            <button
-              onClick={() => load(true)}
-              disabled={refreshing}
-              style={{
-                background: '#1f2937', border: 'none', color: refreshing ? '#374151' : '#6b7280',
-                borderRadius: 6, padding: '6px 12px', fontSize: 12, cursor: refreshing ? 'default' : 'pointer',
-              }}
-            >
-              {refreshing ? '...' : '↻ Refresh'}
-            </button>
-          </div>
-        </>
+          </>
+        )}
+      </div>
+
+      {/* Service breakdown table */}
+      {data?.services?.length > 0 && (
+        <div style={{ border: '1px solid #1f2937', borderTop: 'none', borderRadius: '0 0 12px 12px', overflow: 'hidden', background: '#0f172a' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid #1f2937' }}>
+                <th style={{ textAlign: 'left', padding: '8px 20px', fontSize: 11, fontWeight: 600, color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Service</th>
+                <th style={{ textAlign: 'right', padding: '8px 20px', fontSize: 11, fontWeight: 600, color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Cost</th>
+                <th style={{ textAlign: 'right', padding: '8px 20px', fontSize: 11, fontWeight: 600, color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.06em', width: 80 }}>%</th>
+                <th style={{ padding: '8px 20px 8px 8px', width: 120 }} />
+              </tr>
+            </thead>
+            <tbody>
+              {data.services.map((svc, i) => {
+                const pct = data.this_month.amount > 0 ? (svc.amount / data.this_month.amount) * 100 : 0
+                return (
+                  <tr key={svc.name} style={{ borderBottom: i < data.services.length - 1 ? '1px solid #1a2332' : 'none' }}>
+                    <td style={{ padding: '8px 20px', color: '#d1d5db', fontWeight: 500 }}>{svc.name}</td>
+                    <td style={{ padding: '8px 20px', color: '#f9fafb', fontWeight: 700, textAlign: 'right', fontFamily: 'monospace' }}>
+                      ${svc.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    <td style={{ padding: '8px 20px', color: '#6b7280', textAlign: 'right', fontSize: 12 }}>
+                      {pct.toFixed(1)}%
+                    </td>
+                    <td style={{ padding: '8px 20px 8px 8px' }}>
+                      <div style={{ height: 4, borderRadius: 2, background: '#1f2937', overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${pct}%`, background: '#4f46e5', borderRadius: 2 }} />
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   )
