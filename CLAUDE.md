@@ -4,12 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Software license management web app for InApps. Four main tabs: **License**, **Device**, **Security**, **ODC**.
+Software license management web app for InApps. Five sidebar tabs: **License**, **Device**, **ODC**, **Security**, **AWS**.
 
 - **Backend:** Python 3.13 (FastAPI) — REST API, runs on port 8000
-- **Frontend:** React + Vite — SPA, runs on port 5173
+- **Frontend:** React + Vite — SPA, runs on port 5173. Dark sidebar layout (220px, collapsible to 56px icon-only mode).
 - **Database/Auth:** Firebase (Firestore + Firebase Auth), authenticated via Firebase CLI (no service account keys)
 - **Odoo integration:** ODC tab connects to Odoo 19 ERP via MCP HTTP endpoint (`https://erp.inapps.net/mcp/`)
+- **AWS integration:** AWS tab shows S3, EC2, Lambda, DynamoDB, API Gateway, CloudFront, and billing summary. Region: `ap-southeast-1`. Cost Explorer uses `us-east-1` (global service).
 
 ## Commands
 
@@ -66,12 +67,13 @@ python-inapps-software-license/
 ├── frontend/
 │   ├── src/
 │   │   ├── main.jsx         # React entry, router setup
-│   │   ├── App.jsx          # Tab layout shell (License / Device / Security / ODC)
+│   │   ├── App.jsx          # Dark sidebar shell — collapsible 220px↔56px, emoji nav, Topbar
 │   │   ├── pages/
 │   │   │   ├── License.jsx
 │   │   │   ├── Device.jsx
 │   │   │   ├── Security.jsx
-│   │   │   └── ODC.jsx      # ODC tab — tạo task Odoo (task list ẩn tạm, chỉ dùng test)
+│   │   │   ├── ODC.jsx      # ODC tab — tạo alias mail mới + alias mail config (ODC/Non-ODC, Active/Inactive)
+│   │   │   └── AWS.jsx      # AWS tab — BillingCard + collapsible sections (S3/EC2/Lambda/DynamoDB/APIGW/CF)
 │   │   ├── components/      # Shared UI components
 │   │   └── hooks/           # Custom React hooks (API calls, Firebase)
 │   ├── vite.config.js       # proxy /api → http://localhost:8000
@@ -93,7 +95,9 @@ python-inapps-software-license/
 
 **Odoo MCP integration:** All Odoo calls go through `_mcp_call()` in `backend/core/odoo_client.py`. It wraps HTTP POST to `https://erp.inapps.net/mcp/` with JSON-RPC 2.0 format and Basic auth (`odoo_user:odoo_api_key` from `.env`). Available tools: `odoo_search`, `odoo_create`, `odoo_write`, `odoo_get`, `odoo_count`, `odoo_fields`. Add new Odoo operations by calling `_mcp_call("odoo_<tool>", {...})`.
 
-**ODC page (current state):** Task list is hidden — only the create-task form is shown for testing the Odoo connection. `ODOO_PROJECT_IT_SERVICE = 72` is the Odoo project ID for "IT Service".
+**ODC page:** Two sections — (1) alias mail creation form (calls `/api/odoo/tasks` POST, triggers Odoo task + email notification); (2) alias mail table pulled from DynamoDB (`/api/aws/dynamodb/alias-mail-aliases/items`), config (ODC type + active status) stored in Firestore `alias-mail-config` collection and synced on load. `ODOO_PROJECT_IT_SERVICE = 72` is the Odoo project ID for "IT Service".
+
+**AWS page:** `BillingCard` fetches `/api/aws/billing/summary` (cached 6h in Firestore `aws_billing_cache/summary`). Each resource type renders in a collapsible `Section` with emoji icon, colored left accent border, and count badge. Cost Explorer API must use `region_name="us-east-1"` even when app region is `ap-southeast-1`.
 
 ## MCP Servers (project-scoped)
 

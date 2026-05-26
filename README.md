@@ -1,6 +1,6 @@
 # InApps Software License Manager
 
-Web app quản lý software licenses, devices, và security cho InApps. Tích hợp Odoo ERP để tạo IT service tasks.
+Web app quản lý software licenses, devices, và security cho InApps. Tích hợp Odoo ERP và AWS.
 
 ## Tech Stack
 
@@ -11,14 +11,20 @@ Web app quản lý software licenses, devices, và security cho InApps. Tích h�
 | Database | Firebase Firestore |
 | Auth | Firebase Auth |
 | ERP | Odoo 19 (via MCP HTTP) |
+| Cloud | AWS (S3, EC2, Lambda, DynamoDB, API Gateway, CloudFront) |
 | Deploy | Vercel (serverless) |
 
-## Tabs
+## Sidebar Navigation
 
-- **License** — Quản lý software licenses, group by service
-- **Device** — Quản lý thiết bị
-- **Security** — Quản lý security records
-- **ODC** — Tạo IT service tasks trên Odoo ERP
+App dùng dark sidebar (220px, collapsible về 56px) — click nút `‹/›` để toggle.
+
+| Tab | Chức năng |
+|-----|-----------|
+| 🔑 Licenses | Quản lý software licenses, group by service |
+| 🖥️ Devices | Quản lý thiết bị nhân sự |
+| 👥 ODC | Tạo alias mail mới · Quản lý ODC/Non-ODC config (Firestore) |
+| 🛡️ Security | Quản lý security records & credentials |
+| ☁️ AWS | Billing card · S3 · EC2 · Lambda · DynamoDB · API Gateway · CloudFront |
 
 ## Quick Start
 
@@ -46,6 +52,8 @@ ODOO_USER=...
 ODOO_API_KEY=...
 GMAIL_USER=...
 GMAIL_APP_PASSWORD=...
+AWS_ACCESS_KEY_ID=...
+AWS_SECRET_ACCESS_KEY=...
 ```
 
 **frontend/.env**
