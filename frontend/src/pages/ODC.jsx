@@ -169,14 +169,6 @@ export default function ODC() {
         </div>
       )}
 
-      {/* Header */}
-      <div style={{ marginBottom: 20 }}>
-        <h2 style={{ fontSize: 20, fontWeight: 600, color: '#111827', margin: 0 }}>ODC</h2>
-        <p style={{ fontSize: 14, color: '#6b7280', marginTop: 4 }}>
-          Quản lý task Odoo — Project: <strong>{IT_SERVICE_PROJECT}</strong>
-        </p>
-      </div>
-
       {/* Create task row */}
       <div style={{
         display: 'flex', gap: 8, marginBottom: 24,

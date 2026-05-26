@@ -8,6 +8,15 @@ const STATE_COLOR = {
   terminated: '#9ca3af',
 }
 
+const Chevron = ({ open }) => (
+  <svg
+    width="14" height="14" viewBox="0 0 16 16" fill="none"
+    style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s', flexShrink: 0 }}
+  >
+    <path d="M4 6l4 4 4-4" stroke="#9ca3af" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+)
+
 function formatBytes(bytes) {
   if (bytes === 0) return '0 B'
   const k = 1024
@@ -83,7 +92,7 @@ function S3BucketRow({ bucket, getToken }) {
         <span style={{ fontSize: 14, fontWeight: 500, color: '#111827', fontFamily: 'monospace' }}>{bucket.name}</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <span style={{ fontSize: 12, color: '#9ca3af' }}>{new Date(bucket.created).toLocaleDateString('vi-VN')}</span>
-          <span style={{ fontSize: 12, color: '#6b7280', transition: 'transform 0.15s', display: 'inline-block', transform: open ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
+          <Chevron open={open} />
         </div>
       </button>
 
@@ -141,7 +150,7 @@ function EC2Row({ instance }) {
         <span style={{ fontSize: 14, fontWeight: 600, color: '#111827' }}>{instance.name}</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <Badge color={STATE_COLOR[instance.state] || '#6b7280'} label={instance.state} />
-          <span style={{ fontSize: 12, color: '#6b7280', transition: 'transform 0.15s', display: 'inline-block', transform: open ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
+          <Chevron open={open} />
         </div>
       </button>
 
@@ -185,7 +194,7 @@ function LambdaRow({ fn }) {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0, marginLeft: 12 }}>
           <Badge color="#7c3aed" label={fn.runtime} />
-          <span style={{ fontSize: 12, color: '#6b7280', transition: 'transform 0.15s', display: 'inline-block', transform: open ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
+          <Chevron open={open} />
         </div>
       </button>
 
@@ -227,7 +236,7 @@ function DynamoRow({ name, getToken }) {
     <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, background: '#fff', overflow: 'hidden' }}>
       <button onClick={toggle} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
         <span style={{ fontSize: 13, fontWeight: 500, color: '#111827', fontFamily: 'monospace' }}>{name}</span>
-        <span style={{ fontSize: 12, color: '#6b7280', transition: 'transform 0.15s', display: 'inline-block', transform: open ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
+        <Chevron open={open} />
       </button>
       {open && (
         <div style={{ borderTop: '1px solid #f3f4f6', background: '#fafafa', padding: '10px 16px' }}>
@@ -266,7 +275,7 @@ function APIGatewayRow({ api }) {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <Badge color="#0891b2" label={api.endpoint[0] || 'REST'} />
-          <span style={{ fontSize: 12, color: '#6b7280', transition: 'transform 0.15s', display: 'inline-block', transform: open ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
+          <Chevron open={open} />
         </div>
       </button>
       {open && (
@@ -297,7 +306,7 @@ function CloudFrontRow({ dist }) {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0, marginLeft: 12 }}>
           <Badge color={dist.status === 'Deployed' ? '#16a34a' : '#d97706'} label={dist.status} />
-          <span style={{ fontSize: 12, color: '#6b7280', transition: 'transform 0.15s', display: 'inline-block', transform: open ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
+          <Chevron open={open} />
         </div>
       </button>
       {open && (
@@ -471,13 +480,6 @@ export default function AWS() {
 
   return (
     <div>
-      <div style={{ marginBottom: 24 }}>
-        <h2 style={{ fontSize: 20, fontWeight: 600, color: '#111827', margin: 0 }}>AWS</h2>
-        <p style={{ fontSize: 14, color: '#6b7280', marginTop: 4 }}>
-          Tổng quan tài nguyên AWS — Region: <strong>ap-southeast-1</strong>
-        </p>
-      </div>
-
       <BillingCard getToken={getToken} />
 
       {/* DynamoDB */}
