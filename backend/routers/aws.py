@@ -169,36 +169,56 @@ async def list_instances(token: str = Depends(get_token)):
 
 
 @router.get("/billing/summary")
-async def billing_summary(refresh: bool = False, token: str = Depends(get_token)):
+async def billing_summary(
+    refresh: bool = False,
+    year: int | None = None,
+    month: int | None = None,
+    token: str = Depends(get_token),
+):
     from datetime import datetime, timezone, timedelta
     from core.firebase import get_db
 
     db = get_db()
-    cache_doc = db.collection("aws_billing_cache").document("summary")
+    now = datetime.now(timezone.utc)
+
+    target = now.replace(
+        year=year if year else now.year,
+        month=month if month else now.month,
+        day=1, hour=0, minute=0, second=0, microsecond=0,
+    )
+    is_current = target.year == now.year and target.month == now.month
+    cache_key = target.strftime("%Y-%m")
+    cache_doc = db.collection("aws_billing_cache").document(cache_key)
 
     if not refresh:
         doc = await cache_doc.get()
         if doc.exists:
             data = doc.to_dict()
             cached_at = data.get("cached_at")
-            if cached_at and (datetime.now(timezone.utc) - cached_at).total_seconds() < 6 * 3600:
-                return data
+            if cached_at:
+                age = (now - cached_at).total_seconds()
+                if not is_current or age < 6 * 3600:
+                    return data
 
     try:
-        from datetime import datetime, timezone, timedelta
         ce = boto3.client(
             "ce",
             region_name="us-east-1",
             aws_access_key_id=settings.aws_access_key_id or None,
             aws_secret_access_key=settings.aws_secret_access_key or None,
         )
-        now = datetime.now(timezone.utc)
-        this_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+        this_start = target
         prev_start = (this_start - timedelta(days=1)).replace(day=1)
 
         def fmt(d): return d.strftime("%Y-%m-%d")
 
-        end_date = fmt(now + timedelta(days=1))
+        if is_current:
+            end_date = fmt(now + timedelta(days=1))
+        elif target.month == 12:
+            end_date = fmt(target.replace(year=target.year + 1, month=1))
+        else:
+            end_date = fmt(target.replace(month=target.month + 1))
 
         resp = ce.get_cost_and_usage(
             TimePeriod={"Start": fmt(prev_start), "End": end_date},
@@ -211,8 +231,8 @@ async def billing_summary(refresh: bool = False, token: str = Depends(get_token)
             key = r["TimePeriod"]["Start"][:7]
             monthly[key] = float(r["Total"]["UnblendedCost"]["Amount"])
 
-        this_key = now.strftime("%Y-%m")
-        prev_key = (now.replace(day=1) - timedelta(days=1)).strftime("%Y-%m")
+        this_key = target.strftime("%Y-%m")
+        prev_key = prev_start.strftime("%Y-%m")
         this_amount = monthly.get(this_key, 0.0)
         prev_amount = monthly.get(prev_key, 0.0)
         change_pct = round((this_amount - prev_amount) / prev_amount * 100, 1) if prev_amount else 0.0
@@ -232,14 +252,11 @@ async def billing_summary(refresh: bool = False, token: str = Depends(get_token)
         services.sort(key=lambda x: x["amount"], reverse=True)
 
         result = {
-            "this_month": {"label": now.strftime("%b %Y"), "amount": round(this_amount, 2)},
-            "prev_month": {
-                "label": (now.replace(day=1) - timedelta(days=1)).strftime("%b %Y"),
-                "amount": round(prev_amount, 2),
-            },
+            "this_month": {"label": target.strftime("%b %Y"), "amount": round(this_amount, 2)},
+            "prev_month": {"label": prev_start.strftime("%b %Y"), "amount": round(prev_amount, 2)},
             "change_pct": change_pct,
             "services": services,
-            "cached_at": datetime.now(timezone.utc),
+            "cached_at": now,
         }
         await cache_doc.set(result)
         return result

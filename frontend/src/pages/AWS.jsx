@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 
 const STATE_COLOR = {
@@ -334,19 +334,104 @@ function CloudFrontRow({ dist }) {
   )
 }
 
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+
+function MonthPicker({ value, onChange }) {
+  const [open, setOpen] = useState(false)
+  const [displayYear, setDisplayYear] = useState(value.year)
+  const ref = useRef(null)
+  const now = new Date()
+
+  useEffect(() => {
+    if (!open) return
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+
+  const isFuture = (y, m) => y > now.getFullYear() || (y === now.getFullYear() && m > now.getMonth() + 1)
+  const isSelected = (y, m) => y === value.year && m === value.month
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button
+        onClick={() => { setDisplayYear(value.year); setOpen(o => !o) }}
+        style={{
+          background: '#1f2937', border: 'none', color: '#d1d5db',
+          borderRadius: 6, padding: '6px 12px', fontSize: 12, cursor: 'pointer',
+          display: 'flex', alignItems: 'center', gap: 6,
+        }}
+      >
+        📅 {MONTHS[value.month - 1]} {value.year}
+        <span style={{ color: '#6b7280', fontSize: 10 }}>▾</span>
+      </button>
+
+      {open && (
+        <div style={{
+          position: 'absolute', right: 0, top: 'calc(100% + 6px)', zIndex: 100,
+          background: '#1f2937', borderRadius: 10, padding: 12, width: 200,
+          boxShadow: '0 8px 24px rgba(0,0,0,0.5)', border: '1px solid #374151',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+            <button
+              onClick={() => setDisplayYear(y => y - 1)}
+              style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: 16, padding: '0 8px', lineHeight: 1 }}
+            >◀</button>
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#f9fafb' }}>{displayYear}</span>
+            <button
+              onClick={() => setDisplayYear(y => y + 1)}
+              disabled={displayYear >= now.getFullYear()}
+              style={{ background: 'none', border: 'none', color: displayYear >= now.getFullYear() ? '#374151' : '#9ca3af', cursor: displayYear >= now.getFullYear() ? 'default' : 'pointer', fontSize: 16, padding: '0 8px', lineHeight: 1 }}
+            >▶</button>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4 }}>
+            {MONTHS.map((m, i) => {
+              const monthNum = i + 1
+              const future = isFuture(displayYear, monthNum)
+              const selected = isSelected(displayYear, monthNum)
+              return (
+                <button
+                  key={m}
+                  disabled={future}
+                  onClick={() => { onChange({ year: displayYear, month: monthNum }); setOpen(false) }}
+                  style={{
+                    padding: '7px 4px', borderRadius: 6, border: 'none',
+                    fontSize: 12, fontWeight: selected ? 700 : 400,
+                    cursor: future ? 'default' : 'pointer',
+                    background: selected ? '#4f46e5' : 'transparent',
+                    color: future ? '#374151' : selected ? '#fff' : '#d1d5db',
+                  }}
+                >
+                  {m}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function BillingCard({ getToken }) {
+  const now = new Date()
+  const [selected, setSelected] = useState({ year: now.getFullYear(), month: now.getMonth() + 1 })
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [refreshing, setRefreshing] = useState(false)
 
-  const load = async (force = false) => {
+  const isCurrentMonth = selected.year === now.getFullYear() && selected.month === now.getMonth() + 1
+
+  const load = async (sel, force = false) => {
     force ? setRefreshing(true) : setLoading(true)
     setError(null)
     try {
       const token = await getToken()
-      const url = force ? '/api/aws/billing/summary?refresh=true' : '/api/aws/billing/summary'
-      const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+      const params = new URLSearchParams({ year: sel.year, month: sel.month })
+      if (force) params.set('refresh', 'true')
+      const r = await fetch(`/api/aws/billing/summary?${params}`, { headers: { Authorization: `Bearer ${token}` } })
       const json = r.ok ? await r.json() : await r.json().then(j => Promise.reject(j.detail || r.statusText))
       setData(json)
     } catch (e) {
@@ -357,7 +442,7 @@ function BillingCard({ getToken }) {
     }
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { setData(null); load(selected) }, [selected])
 
   const up = data?.change_pct >= 0
 
@@ -373,36 +458,45 @@ function BillingCard({ getToken }) {
         {data && (
           <>
             <div>
-              <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 500, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Tháng này</div>
+              <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 500, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                {isCurrentMonth ? 'Tháng này' : data.this_month.label}
+              </div>
               <div style={{ fontSize: 28, fontWeight: 800, color: '#f9fafb', letterSpacing: '-0.5px' }}>
                 ${data.this_month.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                <span style={{ fontSize: 13, fontWeight: 500, color: '#4b5563', marginLeft: 6 }}>{data.this_month.label}</span>
+                {isCurrentMonth && <span style={{ fontSize: 13, fontWeight: 500, color: '#4b5563', marginLeft: 6 }}>{data.this_month.label}</span>}
               </div>
               <div style={{ marginTop: 4, fontSize: 12, fontWeight: 600, color: up ? '#f87171' : '#4ade80' }}>
-                {up ? '▲' : '▼'} {Math.abs(data.change_pct)}% so với tháng trước
+                {up ? '▲' : '▼'} {Math.abs(data.change_pct)}% so với {data.prev_month.label}
               </div>
             </div>
             <div style={{ width: 1, height: 48, background: '#1f2937', flexShrink: 0 }} />
             <div>
-              <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 500, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Tháng trước</div>
+              <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 500, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{data.prev_month.label}</div>
               <div style={{ fontSize: 28, fontWeight: 800, color: '#f9fafb', letterSpacing: '-0.5px' }}>
                 ${data.prev_month.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                <span style={{ fontSize: 13, fontWeight: 500, color: '#4b5563', marginLeft: 6 }}>{data.prev_month.label}</span>
               </div>
             </div>
-            <div style={{ marginLeft: 'auto' }}>
-              <button
-                onClick={() => load(true)}
-                disabled={refreshing}
-                style={{
-                  background: '#1f2937', border: 'none', color: refreshing ? '#374151' : '#6b7280',
-                  borderRadius: 6, padding: '6px 12px', fontSize: 12, cursor: refreshing ? 'default' : 'pointer',
-                }}
-              >
-                {refreshing ? '...' : '↻ Refresh'}
-              </button>
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+              <MonthPicker value={selected} onChange={setSelected} />
+              {isCurrentMonth && (
+                <button
+                  onClick={() => load(selected, true)}
+                  disabled={refreshing}
+                  style={{
+                    background: '#1f2937', border: 'none', color: refreshing ? '#374151' : '#6b7280',
+                    borderRadius: 6, padding: '6px 12px', fontSize: 12, cursor: refreshing ? 'default' : 'pointer',
+                  }}
+                >
+                  {refreshing ? '...' : '↻'}
+                </button>
+              )}
             </div>
           </>
+        )}
+        {!loading && !error && !data && (
+          <div style={{ marginLeft: 'auto' }}>
+            <MonthPicker value={selected} onChange={setSelected} />
+          </div>
         )}
       </div>
 
