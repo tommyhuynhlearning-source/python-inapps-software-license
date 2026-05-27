@@ -1,5 +1,3 @@
-import boto3
-from botocore.exceptions import BotoCoreError, ClientError
 from fastapi import APIRouter, Depends, HTTPException
 from core.auth import get_token
 from core.config import settings
@@ -7,10 +5,11 @@ from core.config import settings
 router = APIRouter(prefix="/api/aws", tags=["aws"])
 
 
-def _boto(service: str):
+def _boto(service: str, region: str | None = None):
+    import boto3  # lazy — boto3 is heavy; don't pay import cost on non-AWS cold starts
     return boto3.client(
         service,
-        region_name=settings.aws_region,
+        region_name=region or settings.aws_region,
         aws_access_key_id=settings.aws_access_key_id or None,
         aws_secret_access_key=settings.aws_secret_access_key or None,
     )
@@ -21,7 +20,7 @@ async def get_identity(token: str = Depends(get_token)):
     try:
         sts = _boto("sts")
         return sts.get_caller_identity()
-    except (BotoCoreError, ClientError) as e:
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -31,7 +30,7 @@ async def list_buckets(token: str = Depends(get_token)):
         s3 = _boto("s3")
         resp = s3.list_buckets()
         return [{"name": b["Name"], "created": b["CreationDate"].isoformat()} for b in resp.get("Buckets", [])]
-    except (BotoCoreError, ClientError) as e:
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -48,7 +47,7 @@ async def list_objects(bucket: str, token: str = Depends(get_token)):
             }
             for o in resp.get("Contents", [])
         ]
-    except (BotoCoreError, ClientError) as e:
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -61,7 +60,7 @@ async def list_dynamodb_tables(token: str = Depends(get_token)):
         for page in paginator.paginate():
             tables.extend(page.get("TableNames", []))
         return tables
-    except (BotoCoreError, ClientError) as e:
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -79,7 +78,7 @@ async def describe_dynamodb_table(table_name: str, token: str = Depends(get_toke
             "keys": [{"name": k["AttributeName"], "type": k["KeyType"]} for k in t.get("KeySchema", [])],
             "billing": t.get("BillingModeSummary", {}).get("BillingMode", "PROVISIONED"),
         }
-    except (BotoCoreError, ClientError) as e:
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -98,7 +97,7 @@ async def list_apis(token: str = Depends(get_token)):
             }
             for a in resp.get("items", [])
         ]
-    except (BotoCoreError, ClientError) as e:
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -120,7 +119,7 @@ async def list_distributions(token: str = Depends(get_token)):
             }
             for d in items
         ]
-    except (BotoCoreError, ClientError) as e:
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -141,7 +140,7 @@ async def list_functions(token: str = Depends(get_token)):
             }
             for f in resp.get("Functions", [])
         ]
-    except (BotoCoreError, ClientError) as e:
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -164,7 +163,7 @@ async def list_instances(token: str = Depends(get_token)):
                     "private_ip": i.get("PrivateIpAddress", ""),
                 })
         return instances
-    except (BotoCoreError, ClientError) as e:
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -201,12 +200,7 @@ async def billing_summary(
                     return data
 
     try:
-        ce = boto3.client(
-            "ce",
-            region_name="us-east-1",
-            aws_access_key_id=settings.aws_access_key_id or None,
-            aws_secret_access_key=settings.aws_secret_access_key or None,
-        )
+        ce = _boto("ce", region="us-east-1")
 
         this_start = target
         prev_start = (this_start - timedelta(days=1)).replace(day=1)
@@ -260,7 +254,7 @@ async def billing_summary(
         }
         await cache_doc.set(result)
         return result
-    except (BotoCoreError, ClientError) as e:
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -278,5 +272,5 @@ async def list_alias_mail(token: str = Depends(get_token)):
         ]
         items.sort(key=lambda x: x["display_name"])
         return items
-    except (BotoCoreError, ClientError) as e:
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
