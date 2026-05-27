@@ -6,6 +6,7 @@ _ENV_FILE = Path(__file__).parent.parent / ".env"
 
 class Settings(BaseSettings):
     firebase_project_id: str = ""
+    google_refresh_token: str = ""
     cors_origins: list[str] = ["http://localhost:5173", "*"]
 
     odoo_url: str = "https://erp.inapps.net"

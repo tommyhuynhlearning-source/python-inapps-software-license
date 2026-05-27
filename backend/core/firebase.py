@@ -24,10 +24,28 @@ class _CloudPlatformCredential(fb_creds.Base):
         return self._g_credential
 
 
+def _load_refresh_token() -> str:
+    from core.config import settings
+    token = os.environ.get("GOOGLE_REFRESH_TOKEN") or settings.google_refresh_token
+    if token:
+        return token
+    # Local dev: read directly from ADC file (populated by `firebase login` or `gcloud auth application-default login`)
+    import json
+    adc = os.path.expanduser("~/.config/gcloud/application_default_credentials.json")
+    if os.path.exists(adc):
+        try:
+            d = json.load(open(adc))
+            if d.get("client_id") == _FIREBASE_CLI_CLIENT_ID:
+                return d.get("refresh_token", "")
+        except Exception:
+            pass
+    return ""
+
+
 def _init_app():
     if not firebase_admin._apps:
         from core.config import settings
-        refresh_token = os.environ.get("GOOGLE_REFRESH_TOKEN")
+        refresh_token = _load_refresh_token()
         if refresh_token:
             firebase_admin.initialize_app(
                 credential=_CloudPlatformCredential(refresh_token),
