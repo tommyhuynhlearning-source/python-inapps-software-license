@@ -18,7 +18,7 @@ function useAliasMail(getToken) {
         const token = await getToken()
         const res = await fetch('/api/aws/dynamodb/alias-mail-aliases/items', {
           headers: { Authorization: `Bearer ${token}` },
-          signal: AbortSignal.timeout(15000),
+          signal: AbortSignal.timeout(50000),
         })
         if (!res.ok) throw new Error(res.statusText)
         const json = await res.json()

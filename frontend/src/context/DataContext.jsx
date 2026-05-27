@@ -14,20 +14,17 @@ export function DataProvider({ children }) {
   useEffect(() => {
     getToken()
       .then(token => {
-        const opts = {
-          headers: { Authorization: `Bearer ${token}` },
-          signal: AbortSignal.timeout(15000),
-        }
+        const headers = { Authorization: `Bearer ${token}` }
         return Promise.all([
-          fetch('/api/licenses/', opts).then(r => {
+          fetch('/api/licenses/', { headers, signal: AbortSignal.timeout(50000) }).then(r => {
             if (!r.ok) throw new Error(`Licenses: HTTP ${r.status}`)
             return r.json()
           }),
-          fetch('/api/devices/', opts).then(r => {
+          fetch('/api/devices/', { headers, signal: AbortSignal.timeout(50000) }).then(r => {
             if (!r.ok) throw new Error(`Devices: HTTP ${r.status}`)
             return r.json()
           }),
-          fetch('/api/security/events', opts).then(r => {
+          fetch('/api/security/events', { headers, signal: AbortSignal.timeout(50000) }).then(r => {
             if (!r.ok) throw new Error(`Security: HTTP ${r.status}`)
             return r.json()
           }),
