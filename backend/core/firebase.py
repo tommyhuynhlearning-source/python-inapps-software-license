@@ -29,8 +29,18 @@ def _load_refresh_token() -> str:
     token = os.environ.get("GOOGLE_REFRESH_TOKEN") or settings.google_refresh_token
     if token:
         return token
-    # Local dev: read directly from ADC file (populated by `firebase login` or `gcloud auth application-default login`)
     import json
+    # Try firebase-tools configstore (populated by `npx firebase-tools login`)
+    ft = os.path.expanduser("~/.config/configstore/firebase-tools.json")
+    if os.path.exists(ft):
+        try:
+            d = json.load(open(ft))
+            t = d.get("tokens", {}).get("refresh_token", "")
+            if t:
+                return t
+        except Exception:
+            pass
+    # Try ADC file (populated by `gcloud auth application-default login`)
     adc = os.path.expanduser("~/.config/gcloud/application_default_credentials.json")
     if os.path.exists(adc):
         try:
