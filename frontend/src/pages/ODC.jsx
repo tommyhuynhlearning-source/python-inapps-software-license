@@ -137,7 +137,7 @@ export default function ODC() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ name: taskName.trim() }),
-        signal: AbortSignal.timeout(15000),
+        signal: AbortSignal.timeout(50000),
       })
       if (!res.ok) throw new Error((await res.json()).detail || res.statusText)
       const created = await res.json()
