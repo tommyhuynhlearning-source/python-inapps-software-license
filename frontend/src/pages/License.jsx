@@ -100,6 +100,7 @@ export default function License() {
   const [editTarget, setEditTarget] = useState(null) // { id, ...fields }
   const [form, setForm] = useState(EMPTY_FORM)
   const [submitting, setSubmitting] = useState(false)
+  const [selected, setSelected] = useState(new Set())
 
   const openAdd = () => {
     setEditTarget(null)
@@ -172,9 +173,30 @@ export default function License() {
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       setLicenses(prev => prev.filter(l => l.id !== acc.id))
+      setSelected(prev => { const s = new Set(prev); s.delete(acc.id); return s })
     } catch (err) {
       alert('Lỗi: ' + err.message)
     }
+  }
+
+  const handleBulkDelete = async () => {
+    if (!confirm(`Xóa ${selected.size} tài khoản đã chọn? Không thể hoàn tác.`)) return
+    try {
+      const token = await getToken()
+      await Promise.all([...selected].map(id => fetch(`/api/licenses/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      })))
+      setLicenses(prev => prev.filter(l => !selected.has(l.id)))
+      setSelected(new Set())
+    } catch (err) {
+      alert('Lỗi: ' + err.message)
+    }
+  }
+
+  const toggleSelect = (id, e) => {
+    e.stopPropagation()
+    setSelected(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s })
   }
 
   const totalServices = useMemo(() => groupByService(licenses).length, [licenses])
@@ -209,6 +231,18 @@ export default function License() {
         search={search} onSearch={setSearch} count={services.length}
         onAdd={openAdd}
       />
+      {selected.size > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', marginBottom: 4 }}>
+          <span style={{ fontSize: 13, color: '#374151' }}>Đã chọn {selected.size} tài khoản</span>
+          <button onClick={handleBulkDelete} style={{
+            background: '#ef4444', color: '#fff', border: 'none', borderRadius: 6,
+            padding: '4px 14px', fontSize: 13, cursor: 'pointer', fontWeight: 500,
+          }}>Xóa đã chọn</button>
+          <button onClick={() => setSelected(new Set())} style={{
+            background: 'none', border: 'none', fontSize: 13, color: '#6b7280', cursor: 'pointer',
+          }}>Bỏ chọn</button>
+        </div>
+      )}
 
       {showModal && (
         <Modal title={editTarget ? 'Chỉnh sửa tài khoản' : 'Thêm tài khoản mới'} onClose={() => { setShowModal(false); setEditTarget(null) }} onSubmit={handleSubmit} submitting={submitting}>
@@ -286,7 +320,13 @@ export default function License() {
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                     <thead>
                       <tr>
-                        <th style={{ padding: '8px 44px 6px', textAlign: 'left', fontWeight: 500, color: '#9ca3af' }}>Team</th>
+                        <th style={{ padding: '8px 12px 6px', width: 32 }}>
+                          <input type="checkbox"
+                            checked={accounts.every(a => selected.has(a.id))}
+                            onChange={e => { e.stopPropagation(); setSelected(prev => { const s = new Set(prev); accounts.forEach(a => e.target.checked ? s.add(a.id) : s.delete(a.id)); return s }) }}
+                          />
+                        </th>
+                        <th style={{ padding: '8px 8px 6px', textAlign: 'left', fontWeight: 500, color: '#9ca3af' }}>Team</th>
                         <th style={{ padding: '8px 12px 6px', textAlign: 'left', fontWeight: 500, color: '#9ca3af' }}>Loại tài khoản</th>
                         <th style={{ padding: '8px 12px 6px', textAlign: 'left', fontWeight: 500, color: '#9ca3af' }}>Người quản lý</th>
                         <th style={{ padding: '8px 12px 6px', textAlign: 'left', fontWeight: 500, color: '#9ca3af' }}>Email đăng ký</th>
@@ -297,8 +337,11 @@ export default function License() {
                     </thead>
                     <tbody>
                       {accounts.map(acc => (
-                        <tr key={acc.id} style={{ borderTop: '1px solid #f3f4f6' }}>
-                          <td style={{ padding: '9px 44px', color: '#374151' }}>{acc.team || '—'}</td>
+                        <tr key={acc.id} style={{ borderTop: '1px solid #f3f4f6', background: selected.has(acc.id) ? '#f5f3ff' : 'transparent' }}>
+                          <td style={{ padding: '9px 12px' }}>
+                            <input type="checkbox" checked={selected.has(acc.id)} onChange={e => toggleSelect(acc.id, e)} />
+                          </td>
+                          <td style={{ padding: '9px 12px', color: '#374151' }}>{acc.team || '—'}</td>
                           <td style={{ padding: '9px 12px', color: '#374151' }}>{acc.loaiTaiKhoan || '—'}</td>
                           <td style={{ padding: '9px 12px', color: '#374151' }}>{acc.nguoiQuanLy || '—'}</td>
                           <td style={{ padding: '9px 12px', color: '#374151' }}>{acc.emailDangKy || '—'}</td>
