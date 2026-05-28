@@ -77,6 +77,18 @@ const EMPTY_FORM = {
   chiPhiHangThang: '', loaiChiPhi: '', loaiTaiKhoan: '', nguoiQuanLy: '', ngayHetHan: '',
 }
 
+const toFormValues = (acc) => ({
+  tenPhanMem: acc.tenPhanMem || '',
+  team: acc.team || '',
+  soLuongLicense: acc.soLuongLicense != null ? String(acc.soLuongLicense) : '',
+  chiPhiHangNam: acc.chiPhiHangNam != null ? String(acc.chiPhiHangNam) : '',
+  chiPhiHangThang: acc.chiPhiHangThang != null ? String(acc.chiPhiHangThang) : '',
+  loaiChiPhi: acc.loaiChiPhi || '',
+  loaiTaiKhoan: acc.loaiTaiKhoan || '',
+  nguoiQuanLy: acc.nguoiQuanLy || '',
+  ngayHetHan: acc.ngayHetHan || '',
+})
+
 export default function License() {
   const { getToken } = useAuth()
   const { licenses, setLicenses } = useData()
@@ -84,8 +96,22 @@ export default function License() {
   const [search, setSearch] = useState('')
   const [expanded, setExpanded] = useState(null)
   const [showModal, setShowModal] = useState(false)
+  const [editTarget, setEditTarget] = useState(null) // { id, ...fields }
   const [form, setForm] = useState(EMPTY_FORM)
   const [submitting, setSubmitting] = useState(false)
+
+  const openAdd = () => {
+    setEditTarget(null)
+    setForm(EMPTY_FORM)
+    setShowModal(true)
+  }
+
+  const openEdit = (acc, e) => {
+    e.stopPropagation()
+    setEditTarget(acc)
+    setForm(toFormValues(acc))
+    setShowModal(true)
+  }
 
   const handleSubmit = async e => {
     e.preventDefault()
@@ -98,20 +124,48 @@ export default function License() {
         chiPhiHangNam: form.chiPhiHangNam ? Number(form.chiPhiHangNam) : null,
         chiPhiHangThang: form.chiPhiHangThang ? Number(form.chiPhiHangThang) : null,
       }
-      const res = await fetch('/api/licenses/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(body),
-      })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const created = await res.json()
-      setLicenses(prev => [...prev, created])
+      if (editTarget) {
+        const res = await fetch(`/api/licenses/${editTarget.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify(body),
+        })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const updated = await res.json()
+        setLicenses(prev => prev.map(l => l.id === updated.id ? updated : l))
+      } else {
+        const res = await fetch('/api/licenses/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify(body),
+        })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const created = await res.json()
+        setLicenses(prev => [...prev, created])
+      }
       setShowModal(false)
       setForm(EMPTY_FORM)
+      setEditTarget(null)
     } catch (err) {
       alert('Lỗi: ' + err.message)
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  const handleDelete = async (acc, e) => {
+    e.stopPropagation()
+    if (!confirm(`Xóa tài khoản "${acc.tenPhanMem}" (${acc.loaiTaiKhoan || acc.team || ''})? Không thể hoàn tác.`)) return
+    try {
+      const token = await getToken()
+      const res = await fetch(`/api/licenses/${acc.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      setLicenses(prev => prev.filter(l => l.id !== acc.id))
+    } catch (err) {
+      alert('Lỗi: ' + err.message)
     }
   }
 
@@ -145,11 +199,11 @@ export default function License() {
       <FilterBar
         teams={TEAMS} active={teamFilter} onTeam={setTeamFilter}
         search={search} onSearch={setSearch} count={services.length}
-        onAdd={() => setShowModal(true)}
+        onAdd={openAdd}
       />
 
       {showModal && (
-        <Modal title="Thêm tài khoản mới" onClose={() => setShowModal(false)} onSubmit={handleSubmit} submitting={submitting}>
+        <Modal title={editTarget ? 'Chỉnh sửa tài khoản' : 'Thêm tài khoản mới'} onClose={() => { setShowModal(false); setEditTarget(null) }} onSubmit={handleSubmit} submitting={submitting}>
           <Field label="Tên dịch vụ *">
             <Input required value={form.tenPhanMem} onChange={e => setForm(f => ({ ...f, tenPhanMem: e.target.value }))} placeholder="VD: Claude Pro, Figma..." />
           </Field>
@@ -225,6 +279,7 @@ export default function License() {
                         <th style={{ padding: '8px 12px 6px', textAlign: 'left', fontWeight: 500, color: '#9ca3af' }}>Người quản lý</th>
                         <th style={{ padding: '8px 12px 6px', textAlign: 'left', fontWeight: 500, color: '#9ca3af' }}>Chi phí</th>
                         <th style={{ padding: '8px 12px 6px', textAlign: 'left', fontWeight: 500, color: '#9ca3af' }}>Hết hạn</th>
+                        <th style={{ padding: '8px 12px 6px' }} />
                       </tr>
                     </thead>
                     <tbody>
@@ -242,6 +297,10 @@ export default function License() {
                           </td>
                           <td style={{ padding: '9px 12px', color: isExpiringSoon(acc.ngayHetHan) ? '#f59e0b' : '#374151', fontWeight: isExpiringSoon(acc.ngayHetHan) ? 500 : 400 }}>
                             {acc.ngayHetHan || '—'}
+                          </td>
+                          <td style={{ padding: '9px 12px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                            <button onClick={e => openEdit(acc, e)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', fontSize: 13, padding: '2px 6px' }}>Sửa</button>
+                            <button onClick={e => handleDelete(acc, e)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 13, padding: '2px 6px' }}>Xóa</button>
                           </td>
                         </tr>
                       ))}

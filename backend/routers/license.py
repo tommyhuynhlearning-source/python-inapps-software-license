@@ -42,7 +42,19 @@ async def get_license(license_id: str, token: str = Depends(get_token)):
     return {"id": doc.id, **doc.to_dict()}
 
 
+@router.put("/{license_id}")
+async def update_license(license_id: str, payload: License, token: str = Depends(get_token)):
+    db = get_db(token)
+    ref = db.collection("software_licenses").document(license_id)
+    doc = await ref.get()
+    if not doc.exists:
+        raise HTTPException(status_code=404, detail="License not found")
+    await ref.set(payload.model_dump())
+    return {"id": license_id, **payload.model_dump()}
+
+
 @router.delete("/{license_id}", status_code=204)
 async def delete_license(license_id: str, token: str = Depends(get_token)):
     db = get_db(token)
     await db.collection("software_licenses").document(license_id).delete()
+
