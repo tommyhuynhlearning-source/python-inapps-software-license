@@ -116,10 +116,31 @@ def _update_vercel_env(key: str, value: str):
 
 
 def _trigger_redeploy() -> bool:
-    hook = os.environ.get("VERCEL_DEPLOY_HOOK_URL") or _s().vercel_deploy_hook_url
-    if not hook:
+    """Redeploy bằng Vercel API — không cần deploy hook (Hobby plan compatible)."""
+    token = _vercel_token()
+    project_id = _vercel_project_id()
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+
+    # Lấy deployment mới nhất của production
+    req = urllib.request.Request(
+        f"https://api.vercel.com/v6/deployments?projectId={project_id}&target=production&limit=1",
+        headers=headers,
+    )
+    with urllib.request.urlopen(req, timeout=15) as resp:
+        result = json.loads(resp.read())
+
+    deployments = result.get("deployments", [])
+    if not deployments:
         return False
-    req = urllib.request.Request(hook, data=b"{}", method="POST")
+
+    latest_id = deployments[0]["uid"]
+
+    # Redeploy deployment đó
+    data = json.dumps({"target": "production"}).encode()
+    req = urllib.request.Request(
+        f"https://api.vercel.com/v13/deployments/{latest_id}/redeploy",
+        data=data, headers=headers, method="POST",
+    )
     with urllib.request.urlopen(req, timeout=15) as resp:
         resp.read()
     return True
