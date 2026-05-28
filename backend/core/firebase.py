@@ -54,21 +54,30 @@ def _load_refresh_token() -> str:
 
 def _init_app():
     if not firebase_admin._apps:
+        import json
         from core.config import settings
-        # Service account JSON (Vercel production)
+        cred = None
         sa_json = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS_JSON")
         if sa_json:
-            import json
-            sa_dict = json.loads(sa_json)
-            cred = fb_creds.Certificate(sa_dict)
+            d = json.loads(sa_json)
+            if d.get("type") == "service_account":
+                cred = fb_creds.Certificate(d)
+            elif d.get("type") == "authorized_user":
+                cred = _CloudPlatformCredential.__new__(_CloudPlatformCredential)
+                cred._g_credential = OAuthCredentials(
+                    token=None,
+                    refresh_token=d["refresh_token"],
+                    token_uri="https://oauth2.googleapis.com/token",
+                    client_id=d.get("client_id", _FIREBASE_CLI_CLIENT_ID),
+                    client_secret=d.get("client_secret", _FIREBASE_CLI_CLIENT_SECRET),
+                    scopes=["https://www.googleapis.com/auth/cloud-platform"],
+                )
+        if cred is None:
+            refresh_token = _load_refresh_token()
+            if refresh_token:
+                cred = _CloudPlatformCredential(refresh_token)
+        if cred:
             firebase_admin.initialize_app(cred, options={"projectId": settings.firebase_project_id})
-            return
-        refresh_token = _load_refresh_token()
-        if refresh_token:
-            firebase_admin.initialize_app(
-                credential=_CloudPlatformCredential(refresh_token),
-                options={"projectId": settings.firebase_project_id},
-            )
         else:
             firebase_admin.initialize_app(options={"projectId": settings.firebase_project_id})
 
