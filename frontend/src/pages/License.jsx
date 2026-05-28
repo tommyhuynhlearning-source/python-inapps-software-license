@@ -74,7 +74,7 @@ const FilterBar = ({ teams, active, onTeam, search, onSearch, count, onAdd }) =>
 
 const EMPTY_FORM = {
   tenPhanMem: '', team: '', soLuongLicense: '', chiPhiHangNam: '',
-  chiPhiHangThang: '', loaiChiPhi: '', loaiTaiKhoan: '', nguoiQuanLy: '', ngayHetHan: '',
+  chiPhiHangThang: '', loaiChiPhi: '', loaiTaiKhoan: '', nguoiQuanLy: '', ngayHetHan: '', emailDangKy: '',
 }
 
 const toFormValues = (acc) => ({
@@ -87,6 +87,7 @@ const toFormValues = (acc) => ({
   loaiTaiKhoan: acc.loaiTaiKhoan || '',
   nguoiQuanLy: acc.nguoiQuanLy || '',
   ngayHetHan: acc.ngayHetHan || '',
+  emailDangKy: acc.emailDangKy || '',
 })
 
 export default function License() {
@@ -240,6 +241,9 @@ export default function License() {
           </Field>
           <Field label="Ngày hết hạn">
             <Input type="date" value={form.ngayHetHan} onChange={e => setForm(f => ({ ...f, ngayHetHan: e.target.value }))} />
+          </Field>
+          <Field label="Email đăng ký">
+            <Input type="email" value={form.emailDangKy} onChange={e => setForm(f => ({ ...f, emailDangKy: e.target.value }))} placeholder="email@example.com" />
           </Field>
         </Modal>
       )}

@@ -16,6 +16,7 @@ class License(BaseModel):
     loaiTaiKhoan: str | None = None
     nguoiQuanLy: str | None = None
     ngayHetHan: str | None = None
+    emailDangKy: str | None = None
 
 
 @router.get("/")
