@@ -37,5 +37,12 @@ service cloud.firestore {
                          && request.auth.token.email.matches('.*@inapps\\.net$');
     }
 
+    // Admin config: public read (no auth), no client writes.
+    // Written only by the backend reauth callback using a cloud-platform OAuth token.
+    match /_admin_config/{document} {
+      allow read: if true;
+      allow write: if false;
+    }
+
   }
 }

@@ -43,14 +43,6 @@ def _oauth_client_secret() -> str:
     return _require(os.environ.get("OAUTH_CLIENT_SECRET") or _s().oauth_client_secret, "OAUTH_CLIENT_SECRET")
 
 
-def _vercel_token() -> str:
-    return _require(os.environ.get("VERCEL_TOKEN") or _s().vercel_token, "VERCEL_TOKEN")
-
-
-def _vercel_project_id() -> str:
-    return os.environ.get("VERCEL_PROJECT_ID") or _s().vercel_project_id or "prj_b2fHPSSpBsEAu411iizy7YQARrJs"
-
-
 def _callback_uri(request: Request) -> str:
     # Use production URL in production, current host in dev
     base = str(request.base_url).rstrip("/")
@@ -83,70 +75,20 @@ def _verify_state(state: str, max_age: int = 600) -> bool:
         return False
 
 
-def _update_vercel_env(key: str, value: str):
-    token = _vercel_token()
-    project_id = _vercel_project_id()
-    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-
-    req = urllib.request.Request(
-        f"https://api.vercel.com/v9/projects/{project_id}/env?limit=100",
-        headers=headers,
+def _write_token_to_firestore(access_token: str, refresh_token: str):
+    project_id = _s().firebase_project_id
+    url = (
+        f"https://firestore.googleapis.com/v1/projects/{project_id}"
+        "/databases/(default)/documents/_admin_config/google_refresh_token"
     )
-    with urllib.request.urlopen(req, timeout=15) as resp:
-        envs = json.loads(resp.read())
-
-    env_id = next(
-        (e["id"] for e in envs.get("envs", [])
-         if e["key"] == key and "production" in e.get("target", [])),
-        None,
-    )
-
-    if env_id:
-        data = json.dumps({"value": value}).encode()
-        req = urllib.request.Request(
-            f"https://api.vercel.com/v9/projects/{project_id}/env/{env_id}",
-            data=data, headers=headers, method="PATCH",
-        )
-    else:
-        data = json.dumps({"key": key, "value": value, "target": ["production"], "type": "encrypted"}).encode()
-        req = urllib.request.Request(
-            f"https://api.vercel.com/v9/projects/{project_id}/env",
-            data=data, headers=headers, method="POST",
-        )
-    with urllib.request.urlopen(req, timeout=15) as resp:
-        resp.read()
-
-
-def _trigger_redeploy() -> bool:
-    token = _vercel_token()
-    project_id = _vercel_project_id()
-    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-
+    data = json.dumps({"fields": {"value": {"stringValue": refresh_token}}}).encode()
     req = urllib.request.Request(
-        f"https://api.vercel.com/v6/deployments?projectId={project_id}&target=production&limit=1",
-        headers=headers,
-    )
-    with urllib.request.urlopen(req, timeout=15) as resp:
-        result = json.loads(resp.read())
-
-    deployments = result.get("deployments", [])
-    if not deployments:
-        return False
-
-    d = deployments[0]
-    latest_id = d.get("uid") or d.get("id")
-    if not latest_id:
-        return False
-
-    # POST /v13/deployments with deploymentId clones & redeploys an existing deployment
-    data = json.dumps({"deploymentId": latest_id, "target": "production"}).encode()
-    req = urllib.request.Request(
-        "https://api.vercel.com/v13/deployments",
-        data=data, headers=headers, method="POST",
+        url, data=data,
+        headers={"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"},
+        method="PATCH",
     )
     with urllib.request.urlopen(req, timeout=15) as resp:
         resp.read()
-    return True
 
 
 @router.get("/reauth")
@@ -199,27 +141,17 @@ def reauth_callback(request: Request, code: str = None, state: str = None, error
         return HTMLResponse(_page("❌ Lỗi", f"<p>Không lấy được token: <code>{body}</code></p>"), status_code=500)
 
     refresh_token = tokens.get("refresh_token")
+    access_token = tokens.get("access_token")
     if not refresh_token:
         return HTMLResponse(_page("❌ Lỗi", "<p>Không có refresh_token trong response. Thử lại từ đầu.</p>"), status_code=400)
 
-    # Update Vercel + redeploy
     try:
-        _update_vercel_env("GOOGLE_REFRESH_TOKEN", refresh_token)
+        _write_token_to_firestore(access_token, refresh_token)
     except Exception as e:
-        return HTMLResponse(_page("❌ Lỗi", f"<p>Cập nhật Vercel thất bại: <code>{e}</code></p>"), status_code=500)
+        return HTMLResponse(_page("❌ Lỗi", f"<p>Ghi Firestore thất bại: <code>{e}</code></p>"), status_code=500)
 
-    try:
-        redeployed = _trigger_redeploy()
-    except Exception:
-        redeployed = False
-
-    body = "<p>✅ <strong>GOOGLE_REFRESH_TOKEN</strong> đã được cập nhật trên Vercel.</p>"
-    if redeployed:
-        body += "<p>🚀 Đang redeploy tự động... (~1 phút)</p>"
-    else:
-        body += "<p>⚠️ Token đã được cập nhật. Chạy <code>npx vercel deploy --prod</code> để áp dụng.</p>"
+    body = "<p>✅ Token đã được cập nhật — có hiệu lực ngay lập tức, không cần redeploy.</p>"
     body += '<p><a href="/">← Về trang chủ</a></p>'
-
     return HTMLResponse(_page("✅ Token đã được refresh!", body))
 
 

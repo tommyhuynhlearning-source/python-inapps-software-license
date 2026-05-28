@@ -22,24 +22,38 @@ class _DirectRefreshCredentials(google.auth.credentials.Credentials):
         self._client_secret = client_secret
 
     def refresh(self, request):
-        data = urllib.parse.urlencode({
-            "client_id": self._client_id,
-            "client_secret": self._client_secret,
-            "refresh_token": self._refresh_token,
-            "grant_type": "refresh_token",
-        }).encode()
-        req = urllib.request.Request(
-            "https://oauth2.googleapis.com/token",
-            data=data,
-            headers={"Content-Type": "application/x-www-form-urlencoded"},
-            method="POST",
-        )
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            result = _json.loads(resp.read())
-        self.token = result["access_token"]
-        self.expiry = datetime.datetime.utcnow() + datetime.timedelta(
-            seconds=result.get("expires_in", 3600) - 60
-        )
+        last_exc = None
+        for attempt in range(2):
+            data = urllib.parse.urlencode({
+                "client_id": self._client_id,
+                "client_secret": self._client_secret,
+                "refresh_token": self._refresh_token,
+                "grant_type": "refresh_token",
+            }).encode()
+            req = urllib.request.Request(
+                "https://oauth2.googleapis.com/token",
+                data=data,
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+                method="POST",
+            )
+            try:
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    result = _json.loads(resp.read())
+                self.token = result["access_token"]
+                self.expiry = datetime.datetime.utcnow() + datetime.timedelta(
+                    seconds=result.get("expires_in", 3600) - 60
+                )
+                return
+            except Exception as exc:
+                last_exc = exc
+                if attempt == 0:
+                    # Token may have been rotated via reauth — check Firestore for a fresh one
+                    fresh = _load_token_from_firestore()
+                    if fresh and fresh != self._refresh_token:
+                        self._refresh_token = fresh
+                        continue
+                break
+        raise last_exc
 
 
 class _CloudPlatformCredential(fb_creds.Base):
@@ -53,7 +67,31 @@ class _CloudPlatformCredential(fb_creds.Base):
         return self._g_credential
 
 
+def _load_token_from_firestore() -> str:
+    """Read token from Firestore REST API without auth (uses public read rule on _admin_config)."""
+    try:
+        from core.config import settings
+        project_id = settings.firebase_project_id
+        if not project_id:
+            return ""
+        url = (
+            f"https://firestore.googleapis.com/v1/projects/{project_id}"
+            "/databases/(default)/documents/_admin_config/google_refresh_token"
+        )
+        req = urllib.request.Request(url)
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            doc = _json.loads(resp.read())
+        return doc.get("fields", {}).get("value", {}).get("stringValue", "")
+    except Exception:
+        return ""
+
+
 def _load_refresh_token() -> str:
+    # Firestore is the primary store — updated without redeploy via reauth callback
+    fs_token = _load_token_from_firestore()
+    if fs_token:
+        return fs_token
+
     from core.config import settings
     token = os.environ.get("GOOGLE_REFRESH_TOKEN") or settings.google_refresh_token
     if token:
@@ -73,7 +111,7 @@ def _load_refresh_token() -> str:
     adc = os.path.expanduser("~/.config/gcloud/application_default_credentials.json")
     if os.path.exists(adc):
         try:
-            d = json.load(open(adc))
+            d = _json.load(open(adc))
             if d.get("client_id") == _FIREBASE_CLI_CLIENT_ID:
                 return d.get("refresh_token", "")
         except Exception:
