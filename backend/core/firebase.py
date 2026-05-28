@@ -55,6 +55,14 @@ def _load_refresh_token() -> str:
 def _init_app():
     if not firebase_admin._apps:
         from core.config import settings
+        # Service account JSON (Vercel production)
+        sa_json = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS_JSON")
+        if sa_json:
+            import json
+            sa_dict = json.loads(sa_json)
+            cred = fb_creds.Certificate(sa_dict)
+            firebase_admin.initialize_app(cred, options={"projectId": settings.firebase_project_id})
+            return
         refresh_token = _load_refresh_token()
         if refresh_token:
             firebase_admin.initialize_app(
