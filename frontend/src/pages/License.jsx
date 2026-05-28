@@ -289,6 +289,7 @@ export default function License() {
                         <th style={{ padding: '8px 44px 6px', textAlign: 'left', fontWeight: 500, color: '#9ca3af' }}>Team</th>
                         <th style={{ padding: '8px 12px 6px', textAlign: 'left', fontWeight: 500, color: '#9ca3af' }}>Loại tài khoản</th>
                         <th style={{ padding: '8px 12px 6px', textAlign: 'left', fontWeight: 500, color: '#9ca3af' }}>Người quản lý</th>
+                        <th style={{ padding: '8px 12px 6px', textAlign: 'left', fontWeight: 500, color: '#9ca3af' }}>Email đăng ký</th>
                         <th style={{ padding: '8px 12px 6px', textAlign: 'left', fontWeight: 500, color: '#9ca3af' }}>Chi phí</th>
                         <th style={{ padding: '8px 12px 6px', textAlign: 'left', fontWeight: 500, color: '#9ca3af' }}>Hết hạn</th>
                         <th style={{ padding: '8px 12px 6px' }} />
@@ -300,6 +301,7 @@ export default function License() {
                           <td style={{ padding: '9px 44px', color: '#374151' }}>{acc.team || '—'}</td>
                           <td style={{ padding: '9px 12px', color: '#374151' }}>{acc.loaiTaiKhoan || '—'}</td>
                           <td style={{ padding: '9px 12px', color: '#374151' }}>{acc.nguoiQuanLy || '—'}</td>
+                          <td style={{ padding: '9px 12px', color: '#374151' }}>{acc.emailDangKy || '—'}</td>
                           <td style={{ padding: '9px 12px', color: '#374151' }}>
                             {acc.chiPhiHangNam
                               ? `$${Number(acc.chiPhiHangNam).toLocaleString()}/năm`
