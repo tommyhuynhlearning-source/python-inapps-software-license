@@ -232,14 +232,20 @@ export default function License() {
         onAdd={openAdd}
       />
       {selected.size > 0 && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', marginBottom: 4 }}>
-          <span style={{ fontSize: 13, color: '#374151' }}>Đã chọn {selected.size} tài khoản</span>
+        <div style={{
+          position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
+          display: 'flex', alignItems: 'center', gap: 12,
+          background: '#1f2937', color: '#fff', borderRadius: 10,
+          padding: '10px 20px', boxShadow: '0 4px 20px rgba(0,0,0,0.25)', zIndex: 1000,
+        }}>
+          <span style={{ fontSize: 13 }}>Đã chọn <strong>{selected.size}</strong> tài khoản</span>
           <button onClick={handleBulkDelete} style={{
             background: '#ef4444', color: '#fff', border: 'none', borderRadius: 6,
-            padding: '4px 14px', fontSize: 13, cursor: 'pointer', fontWeight: 500,
+            padding: '5px 16px', fontSize: 13, cursor: 'pointer', fontWeight: 500,
           }}>Xóa đã chọn</button>
           <button onClick={() => setSelected(new Set())} style={{
-            background: 'none', border: 'none', fontSize: 13, color: '#6b7280', cursor: 'pointer',
+            background: 'none', border: '1px solid #4b5563', color: '#d1d5db',
+            borderRadius: 6, padding: '5px 12px', fontSize: 13, cursor: 'pointer',
           }}>Bỏ chọn</button>
         </div>
       )}
