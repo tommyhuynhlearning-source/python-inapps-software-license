@@ -48,12 +48,14 @@ Mở [http://localhost:5173](http://localhost:5173)
 **backend/.env**
 ```
 FIREBASE_PROJECT_ID=...
+GOOGLE_REFRESH_TOKEN=         # tuỳ chọn — tự đọc từ firebase-tools nếu đã firebase login
 ODOO_USER=...
 ODOO_API_KEY=...
-GMAIL_USER=...
-GMAIL_APP_PASSWORD=...
+SMTP_USER=...
+SMTP_PASSWORD=...
 AWS_ACCESS_KEY_ID=...
 AWS_SECRET_ACCESS_KEY=...
+AWS_REGION=ap-southeast-1
 ```
 
 **frontend/.env**
@@ -63,15 +65,34 @@ VITE_FIREBASE_AUTH_DOMAIN=...
 VITE_FIREBASE_PROJECT_ID=...
 ```
 
-Xem `.env.example` trong mỗi thư mục để biết đầy đủ các biến cần thiết.
+## Firebase Auth (backend)
+
+Backend dùng Firebase Admin SDK với **Firebase CLI refresh token** — không dùng service account key (bị chặn bởi org policy).
+
+**Local dev:** Chạy `firebase login` một lần. Backend tự đọc token từ `~/.config/configstore/firebase-tools.json`.
+
+**Production (Vercel):** Env var `GOOGLE_REFRESH_TOKEN` phải là token từ `firebase login`, **không phải** từ `gcloud auth application-default login` (loại đó yêu cầu reauth interactive, không hoạt động trong serverless).
+
+Khi token hết hạn (~1 năm), update lại:
+```bash
+firebase login --reauth
+# Lấy token mới từ ~/.config/configstore/firebase-tools.json → tokens.refresh_token
+# Update Vercel: npx vercel env rm GOOGLE_REFRESH_TOKEN production --yes
+#                cat <token> | npx vercel env add GOOGLE_REFRESH_TOKEN production
+```
 
 ## Deploy
 
 Project deploy trên Vercel. Frontend build tại `frontend/dist/`, backend chạy qua `api/index.py` (serverless function).
 
-```bash
-# Build production
-cd frontend && npm run build
-```
-
 Push lên `main` branch → Vercel tự động deploy.
+
+**Vercel env vars cần thiết:**
+```
+FIREBASE_PROJECT_ID
+GOOGLE_REFRESH_TOKEN          # từ firebase login (xem mục Firebase Auth ở trên)
+ODOO_USER / ODOO_API_KEY
+SMTP_USER / SMTP_PASSWORD
+AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / AWS_REGION
+VITE_FIREBASE_API_KEY / VITE_FIREBASE_AUTH_DOMAIN / VITE_FIREBASE_PROJECT_ID
+```
