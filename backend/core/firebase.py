@@ -62,16 +62,6 @@ def _init_app():
             d = json.loads(sa_json)
             if d.get("type") == "service_account":
                 cred = fb_creds.Certificate(d)
-            elif d.get("type") == "authorized_user":
-                cred = _CloudPlatformCredential.__new__(_CloudPlatformCredential)
-                cred._g_credential = OAuthCredentials(
-                    token=None,
-                    refresh_token=d["refresh_token"],
-                    token_uri="https://oauth2.googleapis.com/token",
-                    client_id=d.get("client_id", _FIREBASE_CLI_CLIENT_ID),
-                    client_secret=d.get("client_secret", _FIREBASE_CLI_CLIENT_SECRET),
-                    scopes=["https://www.googleapis.com/auth/cloud-platform"],
-                )
         if cred is None:
             refresh_token = _load_refresh_token()
             if refresh_token:
