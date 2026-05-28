@@ -63,14 +63,16 @@ def _make_state() -> str:
     nonce = secrets.token_hex(8)
     payload = f"{ts}:{nonce}"
     sig = hmac.new(secret.encode(), payload.encode(), hashlib.sha256).hexdigest()
-    return urllib.parse.quote(f"{payload}:{sig}")
+    return f"{payload}:{sig}"
 
 
 def _verify_state(state: str, max_age: int = 600) -> bool:
     try:
         decoded = urllib.parse.unquote(state)
-        *payload_parts, sig = decoded.rsplit(":", 1)
-        payload = payload_parts[0]
+        parts = decoded.rsplit(":", 1)
+        if len(parts) != 2:
+            return False
+        payload, sig = parts
         secret = _admin_secret()
         expected = hmac.new(secret.encode(), payload.encode(), hashlib.sha256).hexdigest()
         if not hmac.compare_digest(sig, expected):
