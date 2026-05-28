@@ -2,6 +2,20 @@ import { useMemo, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useData } from '../context/DataContext'
 import Modal, { Field, Input, Select } from '../components/Modal'
+import BulkImportModal from '../components/BulkImportModal'
+
+const LICENSE_COLUMNS = [
+  { key: 'tenPhanMem', label: 'Tên phần mềm', required: true, example: 'Claude Pro' },
+  { key: 'team', label: 'Team', example: 'Dev' },
+  { key: 'soLuongLicense', label: 'Số lượng', type: 'number', example: '10' },
+  { key: 'chiPhiHangNam', label: 'Chi phí/năm', type: 'number', example: '1200' },
+  { key: 'chiPhiHangThang', label: 'Chi phí/tháng', type: 'number', example: '' },
+  { key: 'loaiChiPhi', label: 'Loại chi phí', example: 'Annual' },
+  { key: 'loaiTaiKhoan', label: 'Loại tài khoản', example: 'Business' },
+  { key: 'nguoiQuanLy', label: 'Người quản lý', example: 'Tommy' },
+  { key: 'ngayHetHan', label: 'Ngày hết hạn', type: 'date', example: '2025-12-31' },
+  { key: 'emailDangKy', label: 'Email đăng ký', example: 'admin@inapps.net' },
+]
 
 const TEAMS = ['BD', 'Dev', 'Marketing', 'HR']
 
@@ -43,7 +57,7 @@ const groupByService = (list) => {
   return Object.entries(map).map(([name, accounts]) => ({ name, accounts }))
 }
 
-const FilterBar = ({ teams, active, onTeam, search, onSearch, count, onAdd }) => (
+const FilterBar = ({ teams, active, onTeam, search, onSearch, count, onAdd, onImport }) => (
   <div style={{ display: 'flex', alignItems: 'center', gap: 2, marginBottom: 4, flexWrap: 'wrap' }}>
     {['Tất cả', ...teams].map(t => (
       <button key={t} onClick={() => onTeam(t)} style={{
@@ -62,8 +76,15 @@ const FilterBar = ({ teams, active, onTeam, search, onSearch, count, onAdd }) =>
       }}
     />
     <span style={{ fontSize: 13, color: '#9ca3af', marginLeft: 4 }}>{count} dịch vụ</span>
-    <button onClick={onAdd} style={{
+    <button onClick={onImport} style={{
       marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4,
+      background: 'none', border: '1px solid #e5e7eb', borderRadius: 6, cursor: 'pointer',
+      color: '#6b7280', fontSize: 13, padding: '4px 10px',
+    }}>
+      ↑ Import
+    </button>
+    <button onClick={onAdd} style={{
+      display: 'flex', alignItems: 'center', gap: 4,
       background: 'none', border: 'none', cursor: 'pointer',
       color: '#4f46e5', fontSize: 13, fontWeight: 500,
     }}>
@@ -101,6 +122,19 @@ export default function License() {
   const [form, setForm] = useState(EMPTY_FORM)
   const [submitting, setSubmitting] = useState(false)
   const [selected, setSelected] = useState(new Set())
+  const [showBulkImport, setShowBulkImport] = useState(false)
+
+  const handleBulkImport = async (items) => {
+    const token = await getToken()
+    const res = await fetch('/api/licenses/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ items }),
+    })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const created = await res.json()
+    setLicenses(prev => [...prev, ...created])
+  }
 
   const openAdd = () => {
     setEditTarget(null)
@@ -229,8 +263,17 @@ export default function License() {
       <FilterBar
         teams={TEAMS} active={teamFilter} onTeam={setTeamFilter}
         search={search} onSearch={setSearch} count={services.length}
-        onAdd={openAdd}
+        onAdd={openAdd} onImport={() => setShowBulkImport(true)}
       />
+      {showBulkImport && (
+        <BulkImportModal
+          title="Import License hàng loạt"
+          columns={LICENSE_COLUMNS}
+          templateName="license-template.csv"
+          onImport={handleBulkImport}
+          onClose={() => setShowBulkImport(false)}
+        />
+      )}
       {selected.size > 0 && (
         <div style={{
           position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',

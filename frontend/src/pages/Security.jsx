@@ -2,6 +2,16 @@ import { useMemo, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useData } from '../context/DataContext'
 import Modal, { Field, Input, Select } from '../components/Modal'
+import BulkImportModal from '../components/BulkImportModal'
+
+const SECURITY_COLUMNS = [
+  { key: 'tenService', label: 'Tên service', required: true, example: 'AWS' },
+  { key: 'email', label: 'Email', example: 'admin@inapps.net' },
+  { key: 'loaiCredential', label: 'Loại credential', example: 'API Key' },
+  { key: 'vaiTro', label: 'Vai trò', example: 'Admin' },
+  { key: 'nguoiNamGiu', label: 'Người nắm giữ', example: 'Tommy' },
+  { key: 'team', label: 'Team', example: 'Dev' },
+]
 
 const TEAMS = ['BD', 'Dev', 'Marketing', 'HR']
 
@@ -42,6 +52,19 @@ export default function Security() {
   const [editTarget, setEditTarget] = useState(null)
   const [form, setForm] = useState(EMPTY_FORM)
   const [submitting, setSubmitting] = useState(false)
+  const [showBulkImport, setShowBulkImport] = useState(false)
+
+  const handleBulkImport = async (items) => {
+    const token = await getToken()
+    const res = await fetch('/api/security/events/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ items }),
+    })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const created = await res.json()
+    setRecords(prev => [...created, ...prev])
+  }
 
   const openAdd = () => { setEditTarget(null); setForm(EMPTY_FORM); setShowModal(true) }
   const openEdit = (r, e) => { e.stopPropagation(); setEditTarget(r); setForm(toFormValues(r)); setShowModal(true) }
@@ -170,14 +193,28 @@ export default function Security() {
           }}
         />
         <span style={{ fontSize: 13, color: '#9ca3af', marginLeft: 4 }}>{filtered.length} records</span>
+        <button onClick={() => setShowBulkImport(true)} style={{
+          marginLeft: 'auto', background: 'none', border: '1px solid #e5e7eb', borderRadius: 6,
+          cursor: 'pointer', color: '#6b7280', fontSize: 13, padding: '4px 10px',
+        }}>↑ Import</button>
         <button onClick={openAdd} style={{
-          marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4,
+          display: 'flex', alignItems: 'center', gap: 4,
           background: 'none', border: 'none', cursor: 'pointer',
           color: '#4f46e5', fontSize: 13, fontWeight: 500,
         }}>
           <span style={{ fontSize: 18, lineHeight: 1 }}>+</span> Thêm mới
         </button>
       </div>
+
+      {showBulkImport && (
+        <BulkImportModal
+          title="Import Credential hàng loạt"
+          columns={SECURITY_COLUMNS}
+          templateName="security-template.csv"
+          onImport={handleBulkImport}
+          onClose={() => setShowBulkImport(false)}
+        />
+      )}
 
       {showModal && (
         <Modal title={editTarget ? 'Chỉnh sửa credential' : 'Thêm credential mới'} onClose={() => { setShowModal(false); setEditTarget(null) }} onSubmit={handleSubmit} submitting={submitting}>

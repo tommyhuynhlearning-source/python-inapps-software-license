@@ -13,6 +13,10 @@ class Device(BaseModel):
     team: str | None = None
 
 
+class BulkDevice(BaseModel):
+    items: list[Device]
+
+
 @router.get("/")
 async def list_devices(token: str = Depends(get_token)):
     db = get_db(token)
@@ -26,6 +30,17 @@ async def register_device(payload: Device, token: str = Depends(get_token)):
     ref = db.collection("devices").document()
     await ref.set(payload.model_dump())
     return {"id": ref.id, **payload.model_dump()}
+
+
+@router.post("/bulk", status_code=201)
+async def bulk_create_devices(payload: BulkDevice, token: str = Depends(get_token)):
+    db = get_db(token)
+    results = []
+    for item in payload.items:
+        ref = db.collection("devices").document()
+        await ref.set(item.model_dump())
+        results.append({"id": ref.id, **item.model_dump()})
+    return results
 
 
 @router.get("/{device_id}")

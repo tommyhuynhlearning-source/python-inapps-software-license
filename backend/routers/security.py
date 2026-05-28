@@ -15,6 +15,10 @@ class SecurityEvent(BaseModel):
     team: str | None = None
 
 
+class BulkSecurityEvent(BaseModel):
+    items: list[SecurityEvent]
+
+
 @router.get("/events")
 async def list_events(token: str = Depends(get_token)):
     db = get_db(token)
@@ -29,6 +33,18 @@ async def create_event(payload: SecurityEvent, token: str = Depends(get_token)):
     data = payload.model_dump()
     await ref.set(data)
     return {"id": ref.id, **data}
+
+
+@router.post("/events/bulk", status_code=201)
+async def bulk_create_events(payload: BulkSecurityEvent, token: str = Depends(get_token)):
+    db = get_db(token)
+    results = []
+    for item in payload.items:
+        ref = db.collection("security_records").document()
+        data = item.model_dump()
+        await ref.set(data)
+        results.append({"id": ref.id, **data})
+    return results
 
 
 @router.put("/events/{event_id}")

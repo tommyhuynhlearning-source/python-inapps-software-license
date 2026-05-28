@@ -19,6 +19,10 @@ class License(BaseModel):
     emailDangKy: str | None = None
 
 
+class BulkLicense(BaseModel):
+    items: list[License]
+
+
 @router.get("/")
 async def list_licenses(token: str = Depends(get_token)):
     db = get_db(token)
@@ -32,6 +36,17 @@ async def create_license(payload: License, token: str = Depends(get_token)):
     ref = db.collection("software_licenses").document()
     await ref.set(payload.model_dump())
     return {"id": ref.id, **payload.model_dump()}
+
+
+@router.post("/bulk", status_code=201)
+async def bulk_create_licenses(payload: BulkLicense, token: str = Depends(get_token)):
+    db = get_db(token)
+    results = []
+    for item in payload.items:
+        ref = db.collection("software_licenses").document()
+        await ref.set(item.model_dump())
+        results.append({"id": ref.id, **item.model_dump()})
+    return results
 
 
 @router.get("/{license_id}")
@@ -58,4 +73,3 @@ async def update_license(license_id: str, payload: License, token: str = Depends
 async def delete_license(license_id: str, token: str = Depends(get_token)):
     db = get_db(token)
     await db.collection("software_licenses").document(license_id).delete()
-
