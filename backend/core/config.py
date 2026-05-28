@@ -22,6 +22,14 @@ class Settings(BaseSettings):
     aws_secret_access_key: str = ""
     aws_region: str = "ap-southeast-1"
 
+    # Admin reauth (Option B: web OAuth flow)
+    oauth_client_id: str = ""
+    oauth_client_secret: str = ""
+    admin_reauth_secret: str = ""
+    vercel_token: str = ""
+    vercel_project_id: str = "prj_b2fHPSSpBsEAu411iizy7YQARrJs"
+    vercel_deploy_hook_url: str = ""
+
     class Config:
         env_file = str(_ENV_FILE)
 
