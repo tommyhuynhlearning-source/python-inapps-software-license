@@ -106,6 +106,13 @@ export default function License() {
     setShowModal(true)
   }
 
+  const openAddToService = (serviceName, e) => {
+    e.stopPropagation()
+    setEditTarget(null)
+    setForm({ ...EMPTY_FORM, tenPhanMem: serviceName })
+    setShowModal(true)
+  }
+
   const openEdit = (acc, e) => {
     e.stopPropagation()
     setEditTarget(acc)
@@ -266,6 +273,7 @@ export default function License() {
                     ${Number(totalYear).toLocaleString()}/năm
                   </span>
                 )}
+                <button onClick={e => openAddToService(name, e)} title="Thêm tài khoản vào dịch vụ này" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4f46e5', fontSize: 18, lineHeight: 1, padding: '0 4px' }}>+</button>
                 <Chevron open={isOpen} />
               </div>
 
