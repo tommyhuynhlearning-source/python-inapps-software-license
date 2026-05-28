@@ -118,12 +118,10 @@ def _update_vercel_env(key: str, value: str):
 
 
 def _trigger_redeploy() -> bool:
-    """Redeploy bằng Vercel API — không cần deploy hook (Hobby plan compatible)."""
     token = _vercel_token()
     project_id = _vercel_project_id()
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
 
-    # Lấy deployment mới nhất của production
     req = urllib.request.Request(
         f"https://api.vercel.com/v6/deployments?projectId={project_id}&target=production&limit=1",
         headers=headers,
@@ -135,12 +133,15 @@ def _trigger_redeploy() -> bool:
     if not deployments:
         return False
 
-    latest_id = deployments[0]["uid"]
+    d = deployments[0]
+    latest_id = d.get("uid") or d.get("id")
+    if not latest_id:
+        return False
 
-    # Redeploy deployment đó
-    data = json.dumps({"target": "production"}).encode()
+    # POST /v13/deployments with deploymentId clones & redeploys an existing deployment
+    data = json.dumps({"deploymentId": latest_id, "target": "production"}).encode()
     req = urllib.request.Request(
-        f"https://api.vercel.com/v13/deployments/{latest_id}/redeploy",
+        "https://api.vercel.com/v13/deployments",
         data=data, headers=headers, method="POST",
     )
     with urllib.request.urlopen(req, timeout=15) as resp:
@@ -207,13 +208,16 @@ def reauth_callback(request: Request, code: str = None, state: str = None, error
     except Exception as e:
         return HTMLResponse(_page("❌ Lỗi", f"<p>Cập nhật Vercel thất bại: <code>{e}</code></p>"), status_code=500)
 
-    redeployed = _trigger_redeploy()
+    try:
+        redeployed = _trigger_redeploy()
+    except Exception:
+        redeployed = False
 
     body = "<p>✅ <strong>GOOGLE_REFRESH_TOKEN</strong> đã được cập nhật trên Vercel.</p>"
     if redeployed:
         body += "<p>🚀 Đang redeploy tự động... (~1 phút)</p>"
     else:
-        body += "<p>⚠️ Deploy hook chưa cấu hình — chạy <code>npx vercel deploy --prod</code> để redeploy.</p>"
+        body += "<p>⚠️ Token đã được cập nhật. Chạy <code>npx vercel deploy --prod</code> để áp dụng.</p>"
     body += '<p><a href="/">← Về trang chủ</a></p>'
 
     return HTMLResponse(_page("✅ Token đã được refresh!", body))
