@@ -52,6 +52,7 @@ export default function Device() {
 
   const openAdd = () => { setEditTarget(null); setForm(EMPTY_FORM); setShowModal(true) }
   const openEdit = (d, e) => { e.stopPropagation(); setEditTarget(d); setForm(toFormValues(d)); setShowModal(true) }
+  const openAddToType = (loaiMay, e) => { e.stopPropagation(); setEditTarget(null); setForm({ ...EMPTY_FORM, loaiMay }); setShowModal(true) }
 
   const handleSubmit = async e => {
     e.preventDefault()
@@ -206,7 +207,8 @@ export default function Device() {
                 {inUse > 0 && (
                   <span style={{ fontSize: 13, color: '#9ca3af' }}>{inUse} đang sử dụng</span>
                 )}
-                <div style={{ marginLeft: 'auto' }}>
+                <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <button onClick={e => openAddToType(type, e)} title="Thêm thiết bị loại này" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4f46e5', fontSize: 18, lineHeight: 1, padding: '0 4px' }}>+</button>
                   <Chevron open={expanded === type} />
                 </div>
               </div>
