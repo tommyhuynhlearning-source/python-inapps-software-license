@@ -23,6 +23,15 @@ const ShieldIcon = () => (
 
 const EMPTY_FORM = { tenService: '', email: '', loaiCredential: '', vaiTro: '', nguoiNamGiu: '', team: '' }
 
+const toFormValues = (r) => ({
+  tenService: r.tenService || '',
+  email: r.email || '',
+  loaiCredential: r.loaiCredential || '',
+  vaiTro: r.vaiTro || '',
+  nguoiNamGiu: r.nguoiNamGiu || '',
+  team: r.team || '',
+})
+
 export default function Security() {
   const { getToken } = useAuth()
   const { records, setRecords } = useData()
@@ -30,28 +39,60 @@ export default function Security() {
   const [search, setSearch] = useState('')
   const [expanded, setExpanded] = useState(null)
   const [showModal, setShowModal] = useState(false)
+  const [editTarget, setEditTarget] = useState(null)
   const [form, setForm] = useState(EMPTY_FORM)
   const [submitting, setSubmitting] = useState(false)
+
+  const openAdd = () => { setEditTarget(null); setForm(EMPTY_FORM); setShowModal(true) }
+  const openEdit = (r, e) => { e.stopPropagation(); setEditTarget(r); setForm(toFormValues(r)); setShowModal(true) }
 
   const handleSubmit = async e => {
     e.preventDefault()
     setSubmitting(true)
     try {
       const token = await getToken()
-      const res = await fetch('/api/security/events', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(form),
-      })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const created = await res.json()
-      setRecords(prev => [created, ...prev])
+      if (editTarget) {
+        const res = await fetch(`/api/security/events/${editTarget.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify(form),
+        })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const updated = await res.json()
+        setRecords(prev => prev.map(r => r.id === updated.id ? updated : r))
+      } else {
+        const res = await fetch('/api/security/events', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify(form),
+        })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const created = await res.json()
+        setRecords(prev => [created, ...prev])
+      }
       setShowModal(false)
       setForm(EMPTY_FORM)
+      setEditTarget(null)
     } catch (err) {
       alert('Lỗi: ' + err.message)
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  const handleDelete = async (r, e) => {
+    e.stopPropagation()
+    if (!confirm(`Xóa credential "${r.email || r.loaiCredential || r.tenService}"? Không thể hoàn tác.`)) return
+    try {
+      const token = await getToken()
+      const res = await fetch(`/api/security/events/${r.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      setRecords(prev => prev.filter(x => x.id !== r.id))
+    } catch (err) {
+      alert('Lỗi: ' + err.message)
     }
   }
 
@@ -109,7 +150,7 @@ export default function Security() {
           }}
         />
         <span style={{ fontSize: 13, color: '#9ca3af', marginLeft: 4 }}>{filtered.length} records</span>
-        <button onClick={() => setShowModal(true)} style={{
+        <button onClick={openAdd} style={{
           marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4,
           background: 'none', border: 'none', cursor: 'pointer',
           color: '#4f46e5', fontSize: 13, fontWeight: 500,
@@ -119,7 +160,7 @@ export default function Security() {
       </div>
 
       {showModal && (
-        <Modal title="Thêm credential mới" onClose={() => setShowModal(false)} onSubmit={handleSubmit} submitting={submitting}>
+        <Modal title={editTarget ? 'Chỉnh sửa credential' : 'Thêm credential mới'} onClose={() => { setShowModal(false); setEditTarget(null) }} onSubmit={handleSubmit} submitting={submitting}>
           <Field label="Tên service *">
             <Input required value={form.tenService} onChange={e => setForm(f => ({ ...f, tenService: e.target.value }))} placeholder="VD: AWS, GitHub..." />
           </Field>
@@ -176,6 +217,8 @@ export default function Security() {
                       <span style={{ flex: 1 }}>{r.email || r.loaiCredential || '—'}</span>
                       <span style={{ color: '#6b7280', minWidth: 100 }}>{r.vaiTro || '—'}</span>
                       <span style={{ color: '#9ca3af' }}>{r.nguoiNamGiu || '—'}</span>
+                      <button onClick={e => openEdit(r, e)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', fontSize: 13, padding: '2px 6px' }}>Sửa</button>
+                      <button onClick={e => handleDelete(r, e)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 13, padding: '2px 6px' }}>Xóa</button>
                     </div>
                   ))}
                 </div>

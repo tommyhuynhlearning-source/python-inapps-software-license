@@ -32,6 +32,13 @@ const TypeBadge = ({ type }) => {
 
 const EMPTY_FORM = { tenThietBi: '', loaiMay: '', nhanSuSuDung: '', team: '' }
 
+const toFormValues = (d) => ({
+  tenThietBi: d.tenThietBi || '',
+  loaiMay: d.loaiMay || '',
+  nhanSuSuDung: d.nhanSuSuDung || '',
+  team: d.team || '',
+})
+
 export default function Device() {
   const { getToken } = useAuth()
   const { devices, setDevices } = useData()
@@ -39,28 +46,60 @@ export default function Device() {
   const [search, setSearch] = useState('')
   const [expanded, setExpanded] = useState(null)
   const [showModal, setShowModal] = useState(false)
+  const [editTarget, setEditTarget] = useState(null)
   const [form, setForm] = useState(EMPTY_FORM)
   const [submitting, setSubmitting] = useState(false)
+
+  const openAdd = () => { setEditTarget(null); setForm(EMPTY_FORM); setShowModal(true) }
+  const openEdit = (d, e) => { e.stopPropagation(); setEditTarget(d); setForm(toFormValues(d)); setShowModal(true) }
 
   const handleSubmit = async e => {
     e.preventDefault()
     setSubmitting(true)
     try {
       const token = await getToken()
-      const res = await fetch('/api/devices/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(form),
-      })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const created = await res.json()
-      setDevices(prev => [...prev, created])
+      if (editTarget) {
+        const res = await fetch(`/api/devices/${editTarget.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify(form),
+        })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const updated = await res.json()
+        setDevices(prev => prev.map(d => d.id === updated.id ? updated : d))
+      } else {
+        const res = await fetch('/api/devices/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify(form),
+        })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const created = await res.json()
+        setDevices(prev => [...prev, created])
+      }
       setShowModal(false)
       setForm(EMPTY_FORM)
+      setEditTarget(null)
     } catch (err) {
       alert('Lỗi: ' + err.message)
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  const handleDelete = async (d, e) => {
+    e.stopPropagation()
+    if (!confirm(`Xóa thiết bị "${d.tenThietBi}"? Không thể hoàn tác.`)) return
+    try {
+      const token = await getToken()
+      const res = await fetch(`/api/devices/${d.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      setDevices(prev => prev.filter(x => x.id !== d.id))
+    } catch (err) {
+      alert('Lỗi: ' + err.message)
     }
   }
 
@@ -117,7 +156,7 @@ export default function Device() {
           }}
         />
         <span style={{ fontSize: 13, color: '#9ca3af', marginLeft: 4 }}>{filtered.length} records</span>
-        <button onClick={() => setShowModal(true)} style={{
+        <button onClick={openAdd} style={{
           marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4,
           background: 'none', border: 'none', cursor: 'pointer',
           color: '#4f46e5', fontSize: 13, fontWeight: 500,
@@ -127,7 +166,7 @@ export default function Device() {
       </div>
 
       {showModal && (
-        <Modal title="Thêm thiết bị mới" onClose={() => setShowModal(false)} onSubmit={handleSubmit} submitting={submitting}>
+        <Modal title={editTarget ? 'Chỉnh sửa thiết bị' : 'Thêm thiết bị mới'} onClose={() => { setShowModal(false); setEditTarget(null) }} onSubmit={handleSubmit} submitting={submitting}>
           <Field label="Tên thiết bị *">
             <Input required value={form.tenThietBi} onChange={e => setForm(f => ({ ...f, tenThietBi: e.target.value }))} placeholder="VD: MacBook Pro 14" />
           </Field>
@@ -182,6 +221,8 @@ export default function Device() {
                       <span style={{ flex: 1, fontWeight: 500 }}>{d.tenThietBi || '—'}</span>
                       <span style={{ color: '#6b7280', minWidth: 120 }}>{d.nhanSuSuDung || 'Chưa sử dụng'}</span>
                       {d.team && <span style={{ color: '#9ca3af' }}>{d.team}</span>}
+                      <button onClick={e => openEdit(d, e)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', fontSize: 13, padding: '2px 6px' }}>Sửa</button>
+                      <button onClick={e => handleDelete(d, e)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 13, padding: '2px 6px' }}>Xóa</button>
                     </div>
                   ))}
                 </div>

@@ -37,6 +37,17 @@ async def get_device(device_id: str, token: str = Depends(get_token)):
     return {"id": doc.id, **doc.to_dict()}
 
 
+@router.put("/{device_id}")
+async def update_device(device_id: str, payload: Device, token: str = Depends(get_token)):
+    db = get_db(token)
+    ref = db.collection("devices").document(device_id)
+    doc = await ref.get()
+    if not doc.exists:
+        raise HTTPException(status_code=404, detail="Device not found")
+    await ref.set(payload.model_dump())
+    return {"id": device_id, **payload.model_dump()}
+
+
 @router.delete("/{device_id}", status_code=204)
 async def delete_device(device_id: str, token: str = Depends(get_token)):
     db = get_db(token)

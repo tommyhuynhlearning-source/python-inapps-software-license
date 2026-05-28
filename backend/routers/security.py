@@ -31,6 +31,23 @@ async def create_event(payload: SecurityEvent, token: str = Depends(get_token)):
     return {"id": ref.id, **data}
 
 
+@router.put("/events/{event_id}")
+async def update_event(event_id: str, payload: SecurityEvent, token: str = Depends(get_token)):
+    db = get_db(token)
+    ref = db.collection("security_records").document(event_id)
+    doc = await ref.get()
+    if not doc.exists:
+        raise HTTPException(status_code=404, detail="Record not found")
+    await ref.set(payload.model_dump())
+    return {"id": event_id, **payload.model_dump()}
+
+
+@router.delete("/events/{event_id}", status_code=204)
+async def delete_event(event_id: str, token: str = Depends(get_token)):
+    db = get_db(token)
+    await db.collection("security_records").document(event_id).delete()
+
+
 @router.post("/revoke/{license_id}")
 async def revoke_license(license_id: str, token: str = Depends(get_token)):
     db = get_db(token)
