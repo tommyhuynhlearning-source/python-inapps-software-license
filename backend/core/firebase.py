@@ -51,20 +51,34 @@ class _DirectRefreshCredentials(google.auth.credentials.Credentials):
                     fresh = _load_token_from_firestore()
                     if fresh and fresh != self._refresh_token:
                         self._refresh_token = fresh
+                        # Firestore token was issued by the reauth OAUTH client, not Firebase CLI
+                        cid, csec = _get_oauth_client_credentials()
+                        if cid and csec:
+                            self._client_id = cid
+                            self._client_secret = csec
                         continue
                 break
         raise last_exc
 
 
 class _CloudPlatformCredential(fb_creds.Base):
-    """Uses Firebase CLI refresh token with cloud-platform scope."""
-    def __init__(self, refresh_token: str):
-        self._g_credential = _DirectRefreshCredentials(
-            refresh_token, _FIREBASE_CLI_CLIENT_ID, _FIREBASE_CLI_CLIENT_SECRET
-        )
+    """Uses a refresh token with cloud-platform scope."""
+    def __init__(self, refresh_token: str, client_id: str, client_secret: str):
+        self._g_credential = _DirectRefreshCredentials(refresh_token, client_id, client_secret)
 
     def get_credential(self):
         return self._g_credential
+
+
+def _get_oauth_client_credentials() -> tuple[str, str]:
+    """Return (client_id, client_secret) for tokens issued by the reauth OAuth flow."""
+    try:
+        from core.config import settings
+        cid = os.environ.get("OAUTH_CLIENT_ID") or settings.oauth_client_id
+        csec = os.environ.get("OAUTH_CLIENT_SECRET") or settings.oauth_client_secret
+        return cid, csec
+    except Exception:
+        return "", ""
 
 
 def _load_token_from_firestore() -> str:
@@ -86,16 +100,19 @@ def _load_token_from_firestore() -> str:
         return ""
 
 
-def _load_refresh_token() -> str:
+def _load_refresh_token() -> tuple[str, str, str]:
+    """Returns (refresh_token, client_id, client_secret)."""
     # Firestore is the primary store — updated without redeploy via reauth callback
     fs_token = _load_token_from_firestore()
     if fs_token:
-        return fs_token
+        cid, csec = _get_oauth_client_credentials()
+        if cid and csec:
+            return fs_token, cid, csec
 
     from core.config import settings
     token = os.environ.get("GOOGLE_REFRESH_TOKEN") or settings.google_refresh_token
     if token:
-        return token
+        return token, _FIREBASE_CLI_CLIENT_ID, _FIREBASE_CLI_CLIENT_SECRET
     import json
     # Try firebase-tools configstore (populated by `npx firebase-tools login`)
     ft = os.path.expanduser("~/.config/configstore/firebase-tools.json")
@@ -104,7 +121,7 @@ def _load_refresh_token() -> str:
             d = json.load(open(ft))
             t = d.get("tokens", {}).get("refresh_token", "")
             if t:
-                return t
+                return t, _FIREBASE_CLI_CLIENT_ID, _FIREBASE_CLI_CLIENT_SECRET
         except Exception:
             pass
     # Try ADC file (populated by `gcloud auth application-default login`)
@@ -113,10 +130,12 @@ def _load_refresh_token() -> str:
         try:
             d = _json.load(open(adc))
             if d.get("client_id") == _FIREBASE_CLI_CLIENT_ID:
-                return d.get("refresh_token", "")
+                t = d.get("refresh_token", "")
+                if t:
+                    return t, _FIREBASE_CLI_CLIENT_ID, _FIREBASE_CLI_CLIENT_SECRET
         except Exception:
             pass
-    return ""
+    return "", _FIREBASE_CLI_CLIENT_ID, _FIREBASE_CLI_CLIENT_SECRET
 
 
 def _init_app():
@@ -130,9 +149,9 @@ def _init_app():
             if d.get("type") == "service_account":
                 cred = fb_creds.Certificate(d)
         if cred is None:
-            refresh_token = _load_refresh_token()
+            refresh_token, client_id, client_secret = _load_refresh_token()
             if refresh_token:
-                cred = _CloudPlatformCredential(refresh_token)
+                cred = _CloudPlatformCredential(refresh_token, client_id, client_secret)
         if cred:
             firebase_admin.initialize_app(cred, options={"projectId": settings.firebase_project_id})
         else:
