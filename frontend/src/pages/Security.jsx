@@ -45,6 +45,26 @@ export default function Security() {
 
   const openAdd = () => { setEditTarget(null); setForm(EMPTY_FORM); setShowModal(true) }
   const openEdit = (r, e) => { e.stopPropagation(); setEditTarget(r); setForm(toFormValues(r)); setShowModal(true) }
+  const openAddToService = (serviceName, e) => {
+    e.stopPropagation()
+    setEditTarget(null)
+    setForm({ ...EMPTY_FORM, tenService: serviceName })
+    setShowModal(true)
+  }
+  const handleDeleteService = async (serviceName, items, e) => {
+    e.stopPropagation()
+    if (!confirm(`Xóa toàn bộ service "${serviceName}" (${items.length} credential)? Không thể hoàn tác.`)) return
+    try {
+      const token = await getToken()
+      await Promise.all(items.map(r => fetch(`/api/security/events/${r.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      })))
+      setRecords(prev => prev.filter(r => r.tenService !== serviceName))
+    } catch (err) {
+      alert('Lỗi: ' + err.message)
+    }
+  }
 
   const handleSubmit = async e => {
     e.preventDefault()
@@ -204,6 +224,8 @@ export default function Security() {
                     {owners} Owner
                   </span>
                 )}
+                <button onClick={e => openAddToService(service, e)} title="Thêm credential vào service này" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4f46e5', fontSize: 18, lineHeight: 1, padding: '0 4px' }}>+</button>
+                <button onClick={e => handleDeleteService(service, items, e)} title="Xóa toàn bộ service" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 13, padding: '2px 4px' }}>Xóa</button>
                 <Chevron open={expanded === service} />
               </div>
               {expanded === service && (
