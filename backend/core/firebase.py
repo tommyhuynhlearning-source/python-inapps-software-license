@@ -1,23 +1,52 @@
 import os
 import asyncio
+import datetime
+import json as _json
+import urllib.request
+import urllib.parse
 import firebase_admin
+import google.auth.credentials
 from firebase_admin import credentials as fb_creds, firestore as _admin_firestore
-from google.oauth2.credentials import Credentials as OAuthCredentials
 
 _FIREBASE_CLI_CLIENT_ID = "563584335869-fgrhgmd47bqnekij5i8b5pr03ho849e6.apps.googleusercontent.com"
 _FIREBASE_CLI_CLIENT_SECRET = "j9iVZfS8kkCEFUPaAeJV0sAi"
 
 
+class _DirectRefreshCredentials(google.auth.credentials.Credentials):
+    """Refreshes OAuth2 token directly via HTTP, bypassing google-auth reauth flow."""
+
+    def __init__(self, refresh_token: str, client_id: str, client_secret: str):
+        super().__init__()
+        self._refresh_token = refresh_token
+        self._client_id = client_id
+        self._client_secret = client_secret
+
+    def refresh(self, request):
+        data = urllib.parse.urlencode({
+            "client_id": self._client_id,
+            "client_secret": self._client_secret,
+            "refresh_token": self._refresh_token,
+            "grant_type": "refresh_token",
+        }).encode()
+        req = urllib.request.Request(
+            "https://oauth2.googleapis.com/token",
+            data=data,
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            result = _json.loads(resp.read())
+        self.token = result["access_token"]
+        self.expiry = datetime.datetime.utcnow() + datetime.timedelta(
+            seconds=result.get("expires_in", 3600) - 60
+        )
+
+
 class _CloudPlatformCredential(fb_creds.Base):
-    """Uses Firebase CLI refresh token with cloud-platform scope (supported by the CLI OAuth client)."""
+    """Uses Firebase CLI refresh token with cloud-platform scope."""
     def __init__(self, refresh_token: str):
-        self._g_credential = OAuthCredentials(
-            token=None,
-            refresh_token=refresh_token,
-            token_uri="https://oauth2.googleapis.com/token",
-            client_id=_FIREBASE_CLI_CLIENT_ID,
-            client_secret=_FIREBASE_CLI_CLIENT_SECRET,
-            scopes=["https://www.googleapis.com/auth/cloud-platform"],
+        self._g_credential = _DirectRefreshCredentials(
+            refresh_token, _FIREBASE_CLI_CLIENT_ID, _FIREBASE_CLI_CLIENT_SECRET
         )
 
     def get_credential(self):
