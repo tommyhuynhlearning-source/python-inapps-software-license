@@ -91,6 +91,19 @@ def _write_token_to_firestore(access_token: str, refresh_token: str):
         resp.read()
 
 
+@router.get("/firebase-health")
+async def firebase_health():
+    try:
+        from core.firebase import get_db
+        db = get_db()
+        doc = db.collection("_admin_config").document("google_refresh_token")
+        await doc.get()
+        return {"ok": True}
+    except Exception as e:
+        err = str(e)
+        raise HTTPException(status_code=503, detail={"ok": False, "error": err[:300]})
+
+
 @router.get("/reauth")
 def start_reauth(secret: str, request: Request):
     if secret != _admin_secret():
@@ -150,9 +163,7 @@ def reauth_callback(request: Request, code: str = None, state: str = None, error
     except Exception as e:
         return HTMLResponse(_page("❌ Lỗi", f"<p>Ghi Firestore thất bại: <code>{e}</code></p>"), status_code=500)
 
-    body = "<p>✅ Token đã được cập nhật — có hiệu lực ngay lập tức, không cần redeploy.</p>"
-    body += '<p><a href="/">← Về trang chủ</a></p>'
-    return HTMLResponse(_page("✅ Token đã được refresh!", body))
+    return RedirectResponse("/")
 
 
 def _page(title: str, body: str) -> str:

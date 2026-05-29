@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { NavLink, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
 import { DataProvider, useData } from './context/DataContext'
@@ -160,16 +160,38 @@ function AppContent() {
   )
 }
 
+const REAUTH_URL = '/api/admin/reauth?secret=inapps-reauth-2024'
+
 export default function App() {
   const { user } = useAuth()
   const [collapsed, setCollapsed] = useState(false)
+  const [firebaseOk, setFirebaseOk] = useState(undefined)
 
-  if (user === undefined) return (
+  useEffect(() => {
+    if (!user) return
+    fetch('/api/admin/firebase-health')
+      .then(r => setFirebaseOk(r.ok))
+      .catch(() => setFirebaseOk(false))
+  }, [user])
+
+  useEffect(() => {
+    if (firebaseOk === false) {
+      window.location.href = REAUTH_URL
+    }
+  }, [firebaseOk])
+
+  if (user === undefined || (user && firebaseOk === undefined)) return (
     <div style={{ padding: 40, color: '#9ca3af', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
       Loading...
     </div>
   )
   if (user === null) return <Login />
+
+  if (firebaseOk === false) return (
+    <div style={{ padding: 40, color: '#9ca3af', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
+      Firebase token hết hạn. Đang chuyển hướng xác thực lại...
+    </div>
+  )
 
   const initial = (user.displayName || user.email)[0].toUpperCase()
   const displayName = user.displayName || user.email.split('@')[0]
