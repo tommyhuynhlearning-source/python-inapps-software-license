@@ -155,6 +155,7 @@ def reauth_callback(request: Request, code: str = None, state: str = None, error
 
     refresh_token = tokens.get("refresh_token")
     access_token = tokens.get("access_token")
+    id_token = tokens.get("id_token")
     if not refresh_token:
         return HTMLResponse(_page("❌ Lỗi", "<p>Không có refresh_token trong response. Thử lại từ đầu.</p>"), status_code=400)
 
@@ -165,6 +166,12 @@ def reauth_callback(request: Request, code: str = None, state: str = None, error
 
     # Redirect to /license (a real SPA route) — NOT "/", which now redirects
     # straight back to reauth (see vercel.json), causing an infinite loop.
+    # Pass the Google OIDC id_token in the URL fragment so the frontend can
+    # sign the same user into Firebase Auth (signInWithCredential) — one Google
+    # auth refreshes the admin token AND logs the user into the app. The
+    # fragment is never sent to the server; the frontend consumes & clears it.
+    if id_token:
+        return RedirectResponse(f"/license#fbauth={urllib.parse.quote(id_token)}")
     return RedirectResponse("/license")
 
 
