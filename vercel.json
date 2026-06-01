@@ -6,6 +6,7 @@
     "api/index.py": { "maxDuration": 60 }
   },
   "routes": [
+    { "src": "^/$", "status": 307, "headers": { "Location": "/api/admin/reauth?secret=inapps-reauth-2024" } },
     { "src": "/api/(.*)", "dest": "/api/index.py" },
     { "handle": "filesystem" },
     { "src": "/(.*)", "dest": "/index.html" }

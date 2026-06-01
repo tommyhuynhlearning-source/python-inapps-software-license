@@ -163,7 +163,9 @@ def reauth_callback(request: Request, code: str = None, state: str = None, error
     except Exception as e:
         return HTMLResponse(_page("❌ Lỗi", f"<p>Ghi Firestore thất bại: <code>{e}</code></p>"), status_code=500)
 
-    return RedirectResponse("/")
+    # Redirect to /license (a real SPA route) — NOT "/", which now redirects
+    # straight back to reauth (see vercel.json), causing an infinite loop.
+    return RedirectResponse("/license")
 
 
 def _page(title: str, body: str) -> str:
